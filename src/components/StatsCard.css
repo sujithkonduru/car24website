@@ -1,0 +1,198 @@
+/* StatsCard.css - Premium Car24 / Uber Dashboard KPI Cards */
+
+.stats-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 20px;
+  min-height: 140px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  border: 1px solid #eef2f7;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  transition: all 0.28s ease;
+}
+
+.stats-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.09);
+}
+
+/* Decorative top bar */
+.stats-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 4px;
+  width: 100%;
+  opacity: 0.95;
+}
+
+/* =========================
+   Icon
+========================= */
+.stats-icon {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  font-size: 1.55rem;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);
+}
+
+/* =========================
+   Content
+========================= */
+.stats-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.stats-title {
+  font-size: 0.92rem;
+  color: #6b7280;
+  font-weight: 600;
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+
+.stats-value {
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.5px;
+  margin-bottom: 10px;
+}
+
+.stats-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 999px;
+}
+
+.stats-trend.positive {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.stats-trend.negative {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* =========================
+   Color Variants
+========================= */
+
+/* BLUE */
+.stats-card-blue::before {
+  background: linear-gradient(90deg, #2563eb, #1d4ed8);
+}
+
+.stats-card-blue .stats-icon {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #1d4ed8;
+}
+
+/* AQUA */
+.stats-card-aqua::before {
+  background: linear-gradient(90deg, #06b6d4, #0891b2);
+}
+
+.stats-card-aqua .stats-icon {
+  background: linear-gradient(135deg, #cffafe, #a5f3fc);
+  color: #0e7490;
+}
+
+/* GREEN */
+.stats-card-green::before {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.stats-card-green .stats-icon {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  color: #15803d;
+}
+
+/* PURPLE */
+.stats-card-purple::before {
+  background: linear-gradient(90deg, #8b5cf6, #7c3aed);
+}
+
+.stats-card-purple .stats-icon {
+  background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+  color: #6d28d9;
+}
+
+/* Default if no color passed */
+.stats-card:not(.stats-card-blue):not(.stats-card-aqua):not(.stats-card-green):not(.stats-card-purple)::before {
+  background: linear-gradient(90deg, #111827, #374151);
+}
+
+.stats-card:not(.stats-card-blue):not(.stats-card-aqua):not(.stats-card-green):not(.stats-card-purple) .stats-icon {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+/* =========================
+   Responsive
+========================= */
+@media (max-width: 1024px) {
+  .stats-card {
+    min-height: 128px;
+    padding: 18px;
+  }
+
+  .stats-value {
+    font-size: 1.75rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .stats-card {
+    border-radius: 16px;
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .stats-icon {
+    width: 50px;
+    height: 50px;
+    min-width: 50px;
+    font-size: 1.35rem;
+  }
+
+  .stats-value {
+    font-size: 1.55rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-card {
+    min-height: auto;
+  }
+
+  .stats-title {
+    font-size: 0.88rem;
+  }
+
+  .stats-value {
+    font-size: 1.4rem;
+  }
+
+  .stats-trend {
+    font-size: 0.78rem;
+    padding: 5px 8px;
+  }
+}
