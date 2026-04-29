@@ -1013,3 +1013,7 @@ const api = {
 };
 
 export default api;
+
+// Fix for AdminDashboard import
+export { getAdminDashboardStats as getAllData };
+

@@ -16,6 +16,9 @@ import Profile from "./pages/Profile.jsx";
 import CarRegister from "./pages/CarRegister.jsx";
 import Locations from "./pages/Locations.jsx";
 import FAQ from "./pages/FAQ.jsx";
+import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
+import TermsOfService from "./pages/TermsOfService.jsx";
+import CancellationPolicy from "./pages/CancellationPolicy.jsx";
 import Help from "./pages/Help.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import UserDashboard from "./pages/UserDashboard.jsx";
@@ -31,7 +34,7 @@ import StaffDashboard from "./pages/StaffDashboard.jsx";
 import StaffVerify from "./pages/StaffVerify.jsx";
 
 import AdminDashboard from "./pages/AdminDashboard.jsx";
-// import JoinCommunity from "./components/JoinCommunity.jsx"; // Import JoinCommunity component
+import SuperAdminDashboard from "./pages/SuperAdminDashboard.jsx";
 
 // Branch Head Imports
 import BranchLogin from "./pages/BranchLogin.jsx";
@@ -59,9 +62,10 @@ function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/locations" element={<Locations />} />
           <Route path="/faq" element={<FAQ />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/cancellation-policy" element={<CancellationPolicy />} />
           <Route path="/help" element={<Help />} />
-          {/* Join Community Route - Public Access */}
-          {/* <Route path="/joinCommunity" element={<JoinCommunity />} /> */}
           {/* /register-owner is an alias for owner registration */}
           <Route path="/register-owner" element={<Navigate to="/owner/register" replace />} />
 
@@ -77,7 +81,7 @@ function App() {
           <Route
             path="/tracking/:bookingId"
             element={
-              <ProtectedRoute allowedRoles={["user", "owner", "staff", "branch_head", "sub_admin", "admin", "superadmin"]}>
+              <ProtectedRoute allowedRoles={["user", "owner", "staff", "branch_head", "admin", "superadmin"]}>
                 <LiveTracking />
               </ProtectedRoute>
             }
@@ -93,7 +97,7 @@ function App() {
           <Route
             path="/profile"
             element={
-              <ProtectedRoute allowedRoles={["user", "owner", "staff", "branch_head", "sub_admin", "admin", "superadmin"]}>
+              <ProtectedRoute allowedRoles={["user", "owner", "staff", "branch_head", "admin", "superadmin"]}>
                 <Profile />
               </ProtectedRoute>
             }
@@ -101,7 +105,7 @@ function App() {
           <Route
             path="/car-register"
             element={
-              <ProtectedRoute allowedRoles={["user", "owner", "branch_head", "sub_admin"]}>
+              <ProtectedRoute allowedRoles={["user", "owner", "branch_head"]}>
                 <CarRegister />
               </ProtectedRoute>
             }
@@ -115,6 +119,39 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["owner"]} redirectTo="/owner/login">
                 <OwnerDashboard />
+              </ProtectedRoute>
+            }
+          />
+          {/* /owner/cars, /owner/add-car, /owner/earnings, /owner/documents → OwnerDashboard (tabs handled inside) */}
+          <Route
+            path="/owner/cars"
+            element={
+              <ProtectedRoute allowedRoles={["owner"]} redirectTo="/owner/login">
+                <OwnerDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/owner/add-car"
+            element={
+              <ProtectedRoute allowedRoles={["owner"]} redirectTo="/owner/login">
+                <CarRegister />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/owner/earnings"
+            element={
+              <ProtectedRoute allowedRoles={["owner"]} redirectTo="/owner/login">
+                <OwnerDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/owner/documents"
+            element={
+              <ProtectedRoute allowedRoles={["owner"]} redirectTo="/owner/login">
+                <Profile />
               </ProtectedRoute>
             }
           />
@@ -133,10 +170,32 @@ function App() {
           <Route
             path="/staff/dashboard"
             element={
-              <ProtectedRoute
-                allowedRoles={["staff", "sub_admin"]}
-                redirectTo="/staff/login"
-              >
+              <ProtectedRoute allowedRoles={["staff", "subadmin"]} redirectTo="/staff/login">
+                <StaffDashboard />
+              </ProtectedRoute>
+            }
+          />
+          {/* /staff/tasks, /staff/verify, /staff/rides → StaffDashboard (tab-based) */}
+          <Route
+            path="/staff/tasks"
+            element={
+              <ProtectedRoute allowedRoles={["staff", "subadmin"]} redirectTo="/staff/login">
+                <StaffDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/verify"
+            element={
+              <ProtectedRoute allowedRoles={["staff", "subadmin"]} redirectTo="/staff/login">
+                <StaffDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/rides"
+            element={
+              <ProtectedRoute allowedRoles={["staff", "subadmin"]} redirectTo="/staff/login">
                 <StaffDashboard />
               </ProtectedRoute>
             }
@@ -148,10 +207,7 @@ function App() {
           <Route
             path="/branch/dashboard"
             element={
-              <ProtectedRoute
-                allowedRoles={["branch_head", "sub_admin"]}
-                redirectTo="/branch/login"
-              >
+              <ProtectedRoute allowedRoles={["branch_head"]} redirectTo="/branch/login">
                 <BranchDashboard />
               </ProtectedRoute>
             }
@@ -159,21 +215,24 @@ function App() {
           <Route
             path="/branch/bookings"
             element={
-              <ProtectedRoute
-                allowedRoles={["branch_head", "sub_admin"]}
-                redirectTo="/branch/login"
-              >
+              <ProtectedRoute allowedRoles={["branch_head"]} redirectTo="/branch/login">
                 <BranchBookings />
+              </ProtectedRoute>
+            }
+          />
+          {/* /branch/cars → alias for /branch/fleet */}
+          <Route
+            path="/branch/cars"
+            element={
+              <ProtectedRoute allowedRoles={["branch_head"]} redirectTo="/branch/login">
+                <BranchFleet />
               </ProtectedRoute>
             }
           />
           <Route
             path="/branch/fleet"
             element={
-              <ProtectedRoute
-                allowedRoles={["branch_head", "sub_admin"]}
-                redirectTo="/branch/login"
-              >
+              <ProtectedRoute allowedRoles={["branch_head"]} redirectTo="/branch/login">
                 <BranchFleet />
               </ProtectedRoute>
             }
@@ -181,10 +240,7 @@ function App() {
           <Route
             path="/branch/staff"
             element={
-              <ProtectedRoute
-                allowedRoles={["branch_head", "sub_admin"]}
-                redirectTo="/branch/login"
-              >
+              <ProtectedRoute allowedRoles={["branch_head"]} redirectTo="/branch/login">
                 <BranchStaff />
               </ProtectedRoute>
             }
@@ -192,24 +248,27 @@ function App() {
           <Route
             path="/branch/activities"
             element={
-              <ProtectedRoute
-                allowedRoles={["branch_head", "sub_admin"]}
-                redirectTo="/branch/login"
-              >
+              <ProtectedRoute allowedRoles={["branch_head"]} redirectTo="/branch/login">
                 <BranchActivities />
               </ProtectedRoute>
             }
           />
 
-          {/* ── Admin ── */}
+          {/* ── Admin & Super Admin ── */}
+          <Route path="/admin/login" element={<StaffLogin />} />
           <Route
             path="/admin/dashboard"
             element={
-              <ProtectedRoute
-                allowedRoles={["admin", "superadmin"]}
-                redirectTo="/staff/login"
-              >
+              <ProtectedRoute allowedRoles={["admin"]} redirectTo="/staff/login">
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["superadmin"]} redirectTo="/staff/login">
+                <SuperAdminDashboard />
               </ProtectedRoute>
             }
           />

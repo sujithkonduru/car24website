@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { apiGet, apiPost, getToken, decodeToken } from "../api.js";
+import { apiGet, apiPost, getToken } from "../api.js";
 import { carImageUrl, PLACEHOLDER } from "../utils/carImage.js";
+import { slotsFromBookingWindow } from "../lib/slots.js";
 import "./CarDetail.css";
 import "./BookingPanel.css";
 
@@ -42,55 +43,62 @@ const CANCEL_POLICY = [
   },
 ];
 
-// Helper function to calculate price based on duration (matching backend logic)
-function calculatePriceFromSlots(slots, pricing) {
-  if (!Array.isArray(slots) || slots.length === 0) {
-    return null;
+// Helper function to calculate price based on duration
+function calculatePrice(car, pickup, dropoff) {
+  if (!car || !pickup || !dropoff) return null;
+  
+  const start = new Date(pickup);
+  const end = new Date(dropoff);
+  const diffMs = end - start;
+  const diffHours = diffMs / (1000 * 60 * 60);
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  
+  // For rentals less than 6 hours, charge 6-hour rate
+  if (diffHours <= 6) {
+    return {
+      basePrice: car.six_hr_price,
+      durationLabel: "Up to 6 hours",
+      hours: diffHours
+    };
   }
-
-  const { six_hr_price, twelve_hr_price, twentyfour_hr_price } = pricing;
-
-  // Total hours from slots array
-  const totalHours = slots.reduce((sum, s) => sum + s, 0);
-
-  // Smart breakdown matching backend
-  let remaining = totalHours;
-  let totalPrice = 0;
-
-  const days = Math.floor(remaining / 24);
-  totalPrice += days * twentyfour_hr_price;
-  remaining -= days * 24;
-
-  const halfDays = Math.floor(remaining / 12);
-  totalPrice += halfDays * twelve_hr_price;
-  remaining -= halfDays * 12;
-
-  const sixHrs = Math.floor(remaining / 6);
-  totalPrice += sixHrs * six_hr_price;
-
-  const platformFee = Math.ceil(totalPrice * 0.0236);
-  const finalAmount = totalPrice + platformFee;
-
-  return { basePrice: totalPrice, platformFee, totalAmount: finalAmount, totalHours };
-}
-
-// Calculate advance amount matching backend logic
-function calculateAdvanceAmount(totalHours) {
-  let remaining = totalHours;
-  let advance = 0;
-
-  const days = Math.floor(remaining / 24);
-  advance += days * 500;
-  remaining -= days * 24;
-
-  const halfDays = Math.floor(remaining / 12);
-  advance += halfDays * 500;
-  remaining -= halfDays * 12;
-
-  const sixHrs = Math.floor(remaining / 6);
-  advance += sixHrs * 400;
-
-  return advance;
+  // For rentals between 6-12 hours, charge 12-hour rate
+  else if (diffHours <= 12) {
+    return {
+      basePrice: car.twelve_hr_price,
+      durationLabel: "Up to 12 hours",
+      hours: diffHours
+    };
+  }
+  // For rentals more than 12 hours, calculate daily rate
+  else {
+    // Calculate full days and remaining hours
+    const fullDays = Math.floor(diffHours / 24);
+    const remainingHours = diffHours % 24;
+    
+    let totalPrice = 0;
+    
+    // Add full days at 24-hour rate
+    if (fullDays > 0) {
+      totalPrice += fullDays * car.twentyfour_hr_price;
+    }
+    
+    // Add remaining hours (charged at hourly rate = 24-hour rate / 24)
+    if (remainingHours > 0) {
+      const hourlyRate = car.twentyfour_hr_price / 24;
+      totalPrice += remainingHours * hourlyRate;
+    }
+    
+    // Ensure minimum charge of 6-hour rate
+    totalPrice = Math.max(totalPrice, car.six_hr_price);
+    
+    return {
+      basePrice: totalPrice,
+      durationLabel: `${fullDays} day(s) ${remainingHours > 0 ? `+ ${remainingHours.toFixed(1)} hours` : ''}`,
+      hours: diffHours,
+      fullDays: fullDays,
+      remainingHours: remainingHours
+    };
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -251,10 +259,6 @@ function BookingPanel({
                       <span>Base rental</span>
                       <span>₹{estimatedPrice.toLocaleString("en-IN")}</span>
                     </div>
-                    <div className="bp-breakdown-row">
-                      <span>Platform fee <em>(2.36%)</em></span>
-                      <span>+ ₹{platformFee.toLocaleString("en-IN")}</span>
-                    </div>
                     <div className="bp-breakdown-row bp-breakdown-row--total">
                       <span>Total</span>
                       <span className="bp-total-val">₹{totalPrice.toLocaleString("en-IN")}</span>
@@ -396,7 +400,7 @@ function BookingPanel({
                 {booking.credits && (
                   <span className="bp-credits-badge">✓ Advance covered by credits</span>
                 )}
-                <Link to="/myBookings" className="bp-view-link">View booking details →</Link>
+                <Link to="/bookings" className="bp-view-link">View booking details →</Link>
               </div>
             </div>
           )}
@@ -465,10 +469,8 @@ function BookingPanel({
 
 export default function CarDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
   
   // State declarations
-  const [user, setUser] = useState(id);
   const [car, setCar] = useState(null);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -488,6 +490,12 @@ export default function CarDetail() {
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [status, setStatus] = useState("available");
 
+  // Cancel booking state
+  const [userBookings, setUserBookings] = useState([]);
+  const [activeBooking, setActiveBooking] = useState(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelResult, setCancelResult] = useState(null);
+  
   // Image gallery state
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -510,13 +518,6 @@ export default function CarDetail() {
         if (c?.branchId) {
           setSelectedBranchId(c.branchId);
         }
-
-        // Fix: Get real user data from token
-        const token = getToken();
-        if (token) {
-          const decoded = decodeToken(token);
-          setUser(decoded || null);
-        }
       } catch (e) {
         if (!controller.signal.aborted) {
           setErr(e.message || "Failed to load car");
@@ -530,7 +531,7 @@ export default function CarDetail() {
     return () => controller.abort();
   }, [id]);
 
-  // Calculate price when dates change - using backend matching logic
+  // Calculate price when dates change - FIXED with proper hour-based pricing
   useEffect(() => {
     if (!car || !pickup || !dropoff) {
       setEstimatedPrice(null);
@@ -553,21 +554,8 @@ export default function CarDetail() {
       return;
     }
 
-    // Calculate hours difference
-    const diffMs = end - start;
-    const diffHours = diffMs / (1000 * 60 * 60);
-    
-    // Calculate number of 6-hour slots (ceil to ensure full coverage)
-    const numSlots = Math.ceil(diffHours / 6);
-    const slots = Array(numSlots).fill(6);
-    
-    const pricing = {
-      six_hr_price: car.six_hr_price,
-      twelve_hr_price: car.twelve_hr_price,
-      twentyfour_hr_price: car.twentyfour_hr_price
-    };
-    
-    const priceResult = calculatePriceFromSlots(slots, pricing);
+    // Calculate price based on duration
+    const priceResult = calculatePrice(car, pickup, dropoff);
     
     if (!priceResult) {
       setEstimatedPrice(null);
@@ -578,16 +566,14 @@ export default function CarDetail() {
       return;
     }
 
-    const advance = calculateAdvanceAmount(priceResult.totalHours);
+    const basePrice = priceResult.basePrice;
+    const advance = Math.ceil(basePrice * 0.3);
 
-    setEstimatedPrice(priceResult.basePrice);
-    setPlatformFee(priceResult.platformFee);
-    setTotalPrice(priceResult.totalAmount);
+    setEstimatedPrice(basePrice);
+    setPlatformFee(0);
+    setTotalPrice(basePrice);
     setAdvanceAmount(advance);
-    setDurationDetails({
-      durationLabel: `${priceResult.totalHours} hours total`,
-      totalHours: priceResult.totalHours
-    });
+    setDurationDetails(priceResult);
   }, [pickup, dropoff, car]);
 
   // Format date for display
@@ -677,22 +663,6 @@ export default function CarDetail() {
       return;
     }
     
-    // Check if user is logged in and has valid userId
-    const token = getToken();
-    if (!token) {
-      setBookingErr("Please sign in to book this car.");
-      navigate("/login");
-      return;
-    }
-
-    const decoded = decodeToken(token);
-    if (!decoded?.userId && !decoded?.id) {
-      setBookingErr("Invalid user session. Please sign in again.");
-      localStorage.removeItem("car24_token");
-      navigate("/login");
-      return;
-    }
-    
     const start = new Date(pickup);
     const end = new Date(dropoff);
     
@@ -703,15 +673,17 @@ export default function CarDetail() {
     
     // Calculate total hours for validation
     const diffHours = (end - start) / (1000 * 60 * 60);
-    if (diffHours < 6) {
-      setBookingErr("Minimum rental duration is 6 hours.");
+    if (diffHours < 1) {
+      setBookingErr("Minimum rental duration is 1 hour.");
       return;
     }
     
+    const slots = slotsFromBookingWindow(start.toISOString(), end.toISOString());
     const branchId = selectedBranchId || car.branchId;
     
     if (!branchId) {
       setBookingErr("Branch information is missing. Please refresh the page.");
+      setBookingBusy(false);
       return;
     }
     
@@ -730,25 +702,18 @@ export default function CarDetail() {
         return;
       }
 
-      // IMPORTANT: DO NOT send slots array - let backend calculate it
-      // The backend calculates slots based on startTime and endTime
-      const bookingData = {
-        userId: decoded.userId || decoded.id || user?.id,
-        carId: car.id,
-        branchId: branchId,
-        startTime: start.toISOString(),
-        endTime: end.toISOString(),
-        useCredits: useCredits
-      };
-      
-      console.log("Token decoded:", decoded);
-      console.log("Using userId:", decoded.userId || decoded.id || user?.id);
-      console.log("Sending booking request:", bookingData);
-
-      // Create booking - backend will calculate slots and price
+      // Create booking with calculated price
       const res = await apiPost(
         "/bookingApi/bookCar",
-        bookingData,
+        {
+          carId: car.id,
+          branchId: branchId,
+          slots,
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
+          useCredits,
+          calculatedPrice: estimatedPrice // Send the calculated price to backend
+        },
         { withAuth: true }
       );
 
@@ -762,7 +727,6 @@ export default function CarDetail() {
         });
       };
 
-      // If advance is fully covered by credits or no payment needed
       if (res.order == null || res.advancePayable === 0) {
         setBooking({
           ok: true,
@@ -774,7 +738,6 @@ export default function CarDetail() {
         return;
       }
 
-      // Open Razorpay for remaining advance
       openRazorpay(res.order, res.bookingId, async (response) => {
         try {
           await finish({
@@ -790,23 +753,7 @@ export default function CarDetail() {
       });
     } catch (be) {
       console.error("Booking error:", be);
-      
-      // Enhanced error handling
-      let errorMsg = "Unable to create booking. Please try again.";
-      
-      if (be.statusCode === 401 || be.statusCode === 403) {
-        errorMsg = "Session expired. Please sign in again.";
-        localStorage.removeItem("car24_token");
-        navigate("/login");
-      } else if (be.message?.includes("foreign key") || be.message?.includes("userId_fkey")) {
-        errorMsg = "Booking authentication error. Please refresh and try again.";
-      } else if (be.message?.includes("Minimum booking duration")) {
-        errorMsg = be.message;
-      } else if (be.message) {
-        errorMsg = be.message;
-      }
-      
-      setBookingErr(errorMsg);
+      setBookingErr(be.message || "Unable to create booking. Please try again.");
       setBookingBusy(false);
     }
   }
@@ -979,6 +926,16 @@ export default function CarDetail() {
             {car.colour && <span>🎨 {car.colour}</span>}
           </div>
 
+          {/* {car.mileage && (
+            <div className="mileage-info">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+              Mileage: <strong>{car.mileage} km/l</strong>
+            </div>
+          )} */}
+
           {Array.isArray(car.features) && car.features.length > 0 && (
             <div className="features">
               <h3>Features & Amenities</h3>
@@ -1006,11 +963,9 @@ export default function CarDetail() {
                   </div>
                 ))}
               </div>
+
               <p className="small muted">
-                * Platform fee (2.36%) will be added at checkout
-              </p>
-              <p className="small muted">
-                * Minimum booking duration is 6 hours
+                * For rentals exceeding 12 hours, you'll be charged the daily rate + hourly rate for extra hours
               </p>
             </div>
           )}
@@ -1026,7 +981,7 @@ export default function CarDetail() {
       </div>
 
       {/* ═══════════════════════════════════════════════════
-           BOOKING SECTION
+           BOOKING SECTION — Redesigned
       ═══════════════════════════════════════════════════ */}
       <BookingPanel
         car={car}

@@ -9,13 +9,9 @@ const INSTAGRAM = "https://www.instagram.com/cars24india/";
 const PHONE = "6281704664";
 
 const ROLE_LABEL = {
-  user: "User", 
-  owner: "Owner", 
-  staff: "Staff",
-  branch_head: "Branch Head", 
-  sub_admin: "Sub Admin",
-  admin: "Admin", 
-  superadmin: "Super Admin",
+  user: "User", owner: "Owner", staff: "Staff",
+  branch_head: "Branch Head", subadmin: "Sub-Admin",
+  admin: "Admin", superadmin: "Super Admin",
 };
 
 const NAV_LINKS = [
@@ -55,7 +51,7 @@ const ChevronDown = () => (
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { token, user, role, isOwner, isAdmin, isSubAdmin, isStaff, logout } = useAuth();
+  const { token, user, role, isOwner, isAdmin, isBranchHead, isStaff, logout } = useAuth();
   const loggedIn = !!token;
 
   const [scrolled, setScrolled] = useState(false);
@@ -88,10 +84,10 @@ export default function Layout({ children }) {
   }
 
   function getDashboardLink() {
-    // Fix: Check for subadmin role correctly
     if (isOwner) return "/owner/dashboard";
+    if (role === "superadmin") return "/superadmin/dashboard";
     if (isAdmin) return "/admin/dashboard";
-    if (isSubAdmin) return "/branch/dashboard";  // Changed from issubadmin to isSubAdmin
+    if (isBranchHead) return "/branch/dashboard";
     if (isStaff) return "/staff/dashboard";
     return "/dashboard";
   }
@@ -326,8 +322,9 @@ export default function Layout({ children }) {
         <div className="lyt-footer-bottom">
           <p>© {new Date().getFullYear()} Car24. All rights reserved.</p>
           <div className="lyt-footer-bottom-links">
-            <a href="#">Privacy Policy</a>
-            <a href="#">Terms of Service</a>
+            <Link to="/privacy-policy">Privacy Policy</Link>
+            <Link to="/terms-of-service">Terms of Service</Link>
+            <Link to="/cancellation-policy">Cancellation Policy</Link>
           </div>
         </div>
       </footer>

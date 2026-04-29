@@ -224,12 +224,12 @@ export default function Home() {
         </div>
 
         {/* Slide dots */}
-        <div className="hp-slide-dots">
+        {/* <div className="hp-slide-dots">
           {HERO_SLIDES.map((_, i) => (
             <button key={i} className={`hp-slide-dot ${i === currentSlide ? "active" : ""}`}
               onClick={() => setCurrentSlide(i)} aria-label={`Slide ${i + 1}`} />
           ))}
-        </div>
+        </div> */}
 
         {/* Scroll cue */}
         <div className="hp-scroll-cue" aria-hidden="true"><div className="hp-scroll-line" /></div>

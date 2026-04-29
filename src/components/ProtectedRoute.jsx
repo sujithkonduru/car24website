@@ -14,14 +14,16 @@ export default function ProtectedRoute({ children, allowedRoles = "any", redirec
   }
 
   if (allowedRoles !== "any" && !allowedRoles.includes(role)) {
-    // Redirect to the correct portal based on actual role
-    if (role === "owner") return <Navigate to="/owner/dashboard" replace />;
-    if (role === "branch_head") return <Navigate to="/branch/dashboard" replace />;
-    if (role === "staff") return <Navigate to="/staff/dashboard" replace />;
-    if (role === "subadmin") return <Navigate to="/branch/dashboard" replace />;
-    if (["admin", "superadmin"].includes(role)) return <Navigate to="/admin/dashboard" replace />;
-    return <Navigate to="/" replace />;
-  }
+  // Redirect to correct portal based on actual role
+  if (role === "owner") return <Navigate to="/owner/dashboard" replace />;
+  if (role === "branch_head") return <Navigate to="/branch/dashboard" replace />;
+  if (role === "staff") return <Navigate to="/staff/dashboard" replace />;
+  if (role === "sub_admin") return <Navigate to="/staff/dashboard" replace />;
+  if (role === "admin") return <Navigate to="/admin/dashboard" replace />;
+  if (role === "superadmin") return <Navigate to="/superadmin/dashboard" replace />;
+
+  return <Navigate to="/" replace />;
+}
 
   return children;
 }
