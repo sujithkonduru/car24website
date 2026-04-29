@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { getBranches, addCar } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import "./CarRegister.css";
+import "./carRegister.css";
 
 export default function CarRegister() {
   const { token } = useAuth();
