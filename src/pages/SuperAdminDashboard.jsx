@@ -20,7 +20,7 @@ import {
   markOwnerPaid,
   getOwnerPendingBreakdown,
   getBranchRevenue,
-} from "../../../car24website/frontend/src/api.js";
+} from "../api.js";
 import "./AdminDashboard.css";
 
 function fmt(n) {
