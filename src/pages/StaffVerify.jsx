@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { sendStaffOtp, verifyStaffOtp, setToken } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import "./StaffVerify.css";
+import "./Staffverify.css";
 
 export default function StaffVerify() {
   const navigate = useNavigate();
