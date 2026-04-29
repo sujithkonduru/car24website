@@ -333,7 +333,7 @@ export default function Layout({ children }) {
           <p>© {new Date().getFullYear()} Car24. All rights reserved.</p>
           <div className="lyt-footer-bottom-links">
             <Link to="/privacy-policy">Privacy Policy</Link>
-            <Link to="/terms-of-service">Terms of Service</Link>
+            <Link to="/terms-and-conditions">Terms of Service</Link>
             <Link to="/cancellation-policy">Cancellation Policy</Link>
           </div>
         </div>
