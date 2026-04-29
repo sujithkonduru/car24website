@@ -57,76 +57,80 @@ export default function AdminDashboard() {
     setTimeout(() => setNotification(null), 3500);
   }
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      if (activeTab === "overview") {
-        // Only 1 call active — destructure only 1 variable
-        const [rev] = await Promise.allSettled([
-          getBranchRevenue(),
-          // getBranchStats(),
-          // getCarCategories(),
-          // getBranchAnalytics(),
-          // getBranchFinancials(),
-        ]);
-        if (rev.status === "fulfilled") setRevenue(rev.value);
+  const loadData = useCallback(
+    async (tab) => {
+      const target = tab || activeTab;
+      setLoading(true);
+      try {
+        if (target === "overview") {
+          const [rev] = await Promise.allSettled([
+            getBranchRevenue(),
+            // getBranchStats(),
+            // getBranchAnalytics(),
+            // getBranchFinancials(),
+          ]);
+          if (rev.status === "fulfilled") setRevenue(rev.value);
 
-        const bookingsData = await getBranchBookings({ limit: 5 });
-        setBookings(bookingsData?.data || bookingsData || []);
-      }
+          const bookingsData = await getBranchBookings({ limit: 5 });
+          setBookings(bookingsData?.data || bookingsData || []);
+        }
 
-      if (activeTab === "bookings") {
-        const data = await getBranchBookings(bookingFilter);
-        setBookings(data?.data || data || []);
-      }
+        if (target === "bookings") {
+          const data = await getBranchBookings(bookingFilter);
+          setBookings(data?.data || data || []);
+        }
 
-      if (activeTab === "cars") {
-        const data = await getBranchCars(carFilter);
-        setCars(data?.data || data || []);
-      }
+        if (target === "cars") {
+          const data = await getBranchCars(carFilter);
+          setCars(data?.data || data || []);
+        }
 
-      if (activeTab === "staff") {
-        const data = await getBranchStaff();
-        setStaff(data?.data || data || []);
-      }
+        if (target === "staff") {
+          const data = await getBranchStaff();
+          setStaff(data?.data || data || []);
+        }
 
-      if (activeTab === "owners") {
-        const [ownersData, pendingData] = await Promise.allSettled([
-          getBranchOwners(),
-          getPendingOwnerRequests(),
-        ]);
-        if (ownersData.status === "fulfilled")
-          setOwners(ownersData.value?.data || ownersData.value || []);
-        if (pendingData.status === "fulfilled")
-          setPendingOwners(pendingData.value?.data || pendingData.value || []);
-      }
+        if (target === "owners") {
+          const [ownersData, pendingData] = await Promise.allSettled([
+            getBranchOwners(),
+            getPendingOwnerRequests(),
+          ]);
+          if (ownersData.status === "fulfilled")
+            setOwners(ownersData.value?.data || ownersData.value || []);
+          if (pendingData.status === "fulfilled")
+            setPendingOwners(pendingData.value?.data || pendingData.value || []);
+        }
 
-      if (activeTab === "payments") {
-        const data = await getOwnerPendingBreakdown();
-        setPendingPayments(data?.data || data || []);
+        if (target === "payments") {
+          const data = await getOwnerPendingBreakdown();
+          setPendingPayments(data?.data || data || []);
+        }
+      } catch (err) {
+        showNotification(err.message || "Failed to load data", "error");
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      showNotification(err.message || "Failed to load data", "error");
-    }
-    setLoading(false);
-  }, [activeTab, bookingFilter, carFilter]);
+    },
+    [activeTab, bookingFilter, carFilter]
+  );
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadData(activeTab);
+  }, [activeTab, loadData]);
 
   const tabs = [
-    { id: "overview", label: "Dashboard", icon: "📊" },
-    { id: "bookings", label: "Bookings", icon: "📅" },
-    { id: "cars", label: "Fleet", icon: "🚗" },
-    { id: "owners", label: "Owners", icon: "👥" },
-    { id: "staff", label: "Staff", icon: "👨‍💼" },
-    { id: "payments", label: "Payments", icon: "💰" },
+    { id: "overview", label: "Dashboard",  icon: "📊" },
+    { id: "bookings", label: "Bookings",   icon: "📅" },
+    { id: "cars",     label: "Fleet",      icon: "🚗" },
+    { id: "owners",   label: "Owners",     icon: "👥" },
+    { id: "staff",    label: "Staff",      icon: "👨‍💼" },
+    { id: "payments", label: "Payments",   icon: "💰" },
   ];
 
   return (
     <div className="admin-dashboard">
-      {/* Sidebar */}
+
+      {/* ── Sidebar ── */}
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="logo">🚗 CarRental</div>
@@ -149,10 +153,7 @@ export default function AdminDashboard() {
         <div className="sidebar-footer">
           <button
             className="nav-item logout"
-            onClick={() => {
-              logout();
-              navigate("/staff/login");
-            }}
+            onClick={() => { logout(); navigate("/staff/login"); }}
           >
             <span className="nav-icon">🚪</span>
             <span className="nav-label">Logout</span>
@@ -160,8 +161,9 @@ export default function AdminDashboard() {
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* ── Main Content ── */}
       <div className="main-content">
+
         {/* Top Bar */}
         <header className="top-bar">
           <div className="page-title">
@@ -195,86 +197,73 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ── Overview Tab ── */}
+          {/* ════════════════════════════════════
+              OVERVIEW TAB
+          ════════════════════════════════════ */}
           {!loading && activeTab === "overview" && (
             <div className="tab-content">
-              {/* Stats Grid */}
+
+              {/* Primary Stats */}
               <div className="stats-grid">
                 <div className="stat-card">
                   <div className="stat-icon">💰</div>
                   <div className="stat-info">
-                    <span className="stat-value">
-                      {fmt(revenue?.totalRevenue || 0)}
-                    </span>
                     <span className="stat-label">Total Revenue</span>
+                    <span className="stat-value">{fmt(revenue?.totalRevenue || 0)}</span>
                   </div>
                 </div>
-                <div className="stat-card">
+                <div className="stat-card success">
                   <div className="stat-icon">📤</div>
                   <div className="stat-info">
-                    <span className="stat-value">
-                      {fmt(revenue?.branchProfit || 0)}
-                    </span>
                     <span className="stat-label">Branch Profit</span>
+                    <span className="stat-value">{fmt(revenue?.branchProfit || 0)}</span>
                   </div>
                 </div>
                 <div className="stat-card">
                   <div className="stat-icon">🚗</div>
                   <div className="stat-info">
-                    <span className="stat-value">
-                      {stats?.totalCars || cars.length || 0}
-                    </span>
                     <span className="stat-label">Total Cars</span>
+                    <span className="stat-value">{stats?.totalCars || cars.length || 0}</span>
                   </div>
                 </div>
                 <div className="stat-card">
                   <div className="stat-icon">📅</div>
                   <div className="stat-info">
-                    <span className="stat-value">
-                      {stats?.totalBookings || bookings.length || 0}
-                    </span>
                     <span className="stat-label">Total Bookings</span>
+                    <span className="stat-value">{stats?.totalBookings || bookings.length || 0}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Analytics Section */}
+              {/* Analytics Stats (shown only when data is available) */}
               {analytics && (
-                <div className="data-card">
-                  <div className="card-header">
-                    <h3>Branch Analytics</h3>
-                    <button
-                      className="btn-icon"
-                      disabled
-                      style={{ opacity: 0.5 }}
-                    >
-                      📈
-                    </button>
+                <div className="stats-grid">
+                  <div className="stat-card primary">
+                    <div className="stat-icon">📋</div>
+                    <div className="stat-info">
+                      <span className="stat-label">Active Bookings</span>
+                      <span className="stat-value">{analytics.activeBookings || 0}</span>
+                    </div>
                   </div>
-                  <div className="analytics-grid">
-                    <div className="analytics-item">
-                      <span className="analytics-label">Active Bookings</span>
-                      <span className="analytics-value">
-                        {analytics.activeBookings || 0}
-                      </span>
+                  <div className="stat-card success">
+                    <div className="stat-icon">✅</div>
+                    <div className="stat-info">
+                      <span className="stat-label">Available Cars</span>
+                      <span className="stat-value">{analytics.availableCars || 0}</span>
                     </div>
-                    <div className="analytics-item">
-                      <span className="analytics-label">Available Cars</span>
-                      <span className="analytics-value">
-                        {analytics.availableCars || 0}
-                      </span>
+                  </div>
+                  <div className="stat-card warning">
+                    <div className="stat-icon">📊</div>
+                    <div className="stat-info">
+                      <span className="stat-label">Utilization Rate</span>
+                      <span className="stat-value">{analytics.utilizationRate || 0}%</span>
                     </div>
-                    <div className="analytics-item">
-                      <span className="analytics-label">Utilization Rate</span>
-                      <span className="analytics-value">
-                        {analytics.utilizationRate || 0}%
-                      </span>
-                    </div>
-                    <div className="analytics-item">
-                      <span className="analytics-label">Avg. Daily Revenue</span>
-                      <span className="analytics-value">
-                        {fmt(analytics.avgDailyRevenue || 0)}
-                      </span>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">💵</div>
+                    <div className="stat-info">
+                      <span className="stat-label">Avg. Daily Revenue</span>
+                      <span className="stat-value">{fmt(analytics.avgDailyRevenue || 0)}</span>
                     </div>
                   </div>
                 </div>
@@ -285,10 +274,7 @@ export default function AdminDashboard() {
                 <div className="data-card">
                   <div className="card-header">
                     <h3>Recent Bookings</h3>
-                    <button
-                      className="btn-text"
-                      onClick={() => setActiveTab("bookings")}
-                    >
+                    <button className="btn-text" onClick={() => setActiveTab("bookings")}>
                       View All →
                     </button>
                   </div>
@@ -308,7 +294,14 @@ export default function AdminDashboard() {
                         {bookings.slice(0, 5).map((booking) => (
                           <tr key={booking.id}>
                             <td>#{booking.id}</td>
-                            <td>{booking.customer_name}</td>
+                            <td>
+                              <div className="member-info">
+                                <div className="member-avatar">
+                                  {booking.customer_name?.charAt(0)}
+                                </div>
+                                <div className="member-name">{booking.customer_name}</div>
+                              </div>
+                            </td>
                             <td>{booking.car_model}</td>
                             <td className="amount">{fmt(booking.amount)}</td>
                             <td>
@@ -327,20 +320,25 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ── Bookings Tab ── */}
+          {/* ════════════════════════════════════
+              BOOKINGS TAB
+          ════════════════════════════════════ */}
           {!loading && activeTab === "bookings" && (
             <div className="tab-content">
               <div className="data-card">
                 <div className="card-header">
                   <h3>All Bookings</h3>
-                  <div className="filter-bar">
+                  <span className="badge">{bookings.length} Records</span>
+                </div>
+
+                {/* Filters */}
+                <div className="filter-bar">
+                  <div className="filter-group">
+                    <label>Status</label>
                     <select
                       value={bookingFilter.status}
                       onChange={(e) =>
-                        setBookingFilter({
-                          ...bookingFilter,
-                          status: e.target.value,
-                        })
+                        setBookingFilter({ ...bookingFilter, status: e.target.value })
                       }
                       className="filter-select"
                     >
@@ -351,23 +349,24 @@ export default function AdminDashboard() {
                       <option value="completed">Completed</option>
                       <option value="cancelled">Cancelled</option>
                     </select>
+                  </div>
+                  <div className="filter-group">
+                    <label>Search Customer</label>
                     <input
                       type="text"
-                      placeholder="Search customer..."
+                      placeholder="Search by name..."
                       value={bookingFilter.search}
                       onChange={(e) =>
-                        setBookingFilter({
-                          ...bookingFilter,
-                          search: e.target.value,
-                        })
+                        setBookingFilter({ ...bookingFilter, search: e.target.value })
                       }
                       className="filter-input"
                     />
-                    <button className="btn-primary" onClick={loadData}>
-                      Apply Filter
-                    </button>
                   </div>
+                  <button className="btn-primary" onClick={() => loadData("bookings")}>
+                    Apply Filters
+                  </button>
                 </div>
+
                 <div className="table-responsive">
                   <table className="data-table">
                     <thead>
@@ -384,20 +383,21 @@ export default function AdminDashboard() {
                     <tbody>
                       {bookings.length === 0 ? (
                         <tr>
-                          <td colSpan="7" className="empty-state">
-                            No bookings found
-                          </td>
+                          <td colSpan={7} className="empty-state">No bookings found</td>
                         </tr>
                       ) : (
                         bookings.map((booking) => (
                           <tr key={booking.id}>
                             <td>#{booking.id}</td>
                             <td>
-                              <div>
-                                <div>{booking.customer_name}</div>
-                                <small className="text-muted">
-                                  {booking.customer_phone}
-                                </small>
+                              <div className="member-info">
+                                <div className="member-avatar">
+                                  {booking.customer_name?.charAt(0)}
+                                </div>
+                                <div>
+                                  <div className="member-name">{booking.customer_name}</div>
+                                  <div className="member-email">{booking.customer_phone}</div>
+                                </div>
                               </div>
                             </td>
                             <td>{booking.car_model}</td>
@@ -405,9 +405,7 @@ export default function AdminDashboard() {
                             <td>{fmtDate(booking.return_date)}</td>
                             <td className="amount">{fmt(booking.amount)}</td>
                             <td>
-                              <span
-                                className={`status-badge ${booking.status}`}
-                              >
+                              <span className={`status-badge ${booking.status}`}>
                                 {booking.status}
                               </span>
                             </td>
@@ -421,7 +419,9 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ── Cars / Fleet Tab ── */}
+          {/* ════════════════════════════════════
+              FLEET TAB
+          ════════════════════════════════════ */}
           {!loading && activeTab === "cars" && (
             <div className="tab-content">
               <div className="data-card">
@@ -430,98 +430,121 @@ export default function AdminDashboard() {
                   <span className="badge info">Read Only Mode</span>
                 </div>
 
-                <div className="filter-bar" style={{ marginBottom: "1rem" }}>
-                  <select
-                    value={carFilter.status}
-                    onChange={(e) =>
-                      setCarFilter({ ...carFilter, status: e.target.value })
-                    }
-                    className="filter-select"
-                  >
-                    <option value="">All Status</option>
-                    <option value="available">Available</option>
-                    <option value="rented">Rented</option>
-                    <option value="maintenance">Maintenance</option>
-                  </select>
-                  <button className="btn-primary" onClick={loadData}>
-                    Filter
+                {/* Filters */}
+                <div className="filter-bar">
+                  <div className="filter-group">
+                    <label>Status</label>
+                    <select
+                      value={carFilter.status}
+                      onChange={(e) =>
+                        setCarFilter({ ...carFilter, status: e.target.value })
+                      }
+                      className="filter-select"
+                    >
+                      <option value="">All Status</option>
+                      <option value="available">Available</option>
+                      <option value="rented">Rented</option>
+                      <option value="maintenance">Maintenance</option>
+                    </select>
+                  </div>
+                  <button className="btn-primary" onClick={() => loadData("cars")}>
+                    Apply Filters
                   </button>
                 </div>
 
-                <div className="cars-grid">
-                  {cars.length === 0 ? (
-                    <div className="empty-state">No cars found</div>
-                  ) : (
-                    cars.map((car) => (
-                      <div key={car.id} className="car-card">
-                        <div className="car-image">
-                          <div className="car-placeholder">🚗</div>
-                          <span className={`car-status ${car.status}`}>
-                            {car.status}
-                          </span>
-                        </div>
-                        <div className="car-details">
-                          <h4>
-                            {car.brand} {car.model}
-                          </h4>
-                          <p className="car-plate">{car.plate_number}</p>
-                          <div className="car-specs">
-                            <span>📅 {car.year || "N/A"}</span>
-                            <span>
-                              🏷️ {car.category_name || "Uncategorized"}
-                            </span>
-                          </div>
-                          <div className="car-pricing">
-                            <span className="price">
-                              {fmt(car.daily_rate)}/day
-                            </span>
-                            <span className="price">
-                              {fmt(car.hourly_rate)}/hr
-                            </span>
-                          </div>
-                          <div className="car-actions-readonly">
-                            <span className="readonly-badge">View Only</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
+                <div className="table-responsive">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Vehicle</th>
+                        <th>Plate No.</th>
+                        <th>Year</th>
+                        <th>Category</th>
+                        <th>Daily Rate</th>
+                        <th>Hourly Rate</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cars.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="empty-state">No cars found</td>
+                        </tr>
+                      ) : (
+                        cars.map((car) => (
+                          <tr key={car.id}>
+                            <td>
+                              <div className="member-info">
+                                <div className="member-avatar">🚗</div>
+                                <div>
+                                  <div className="member-name">
+                                    {car.brand} {car.model}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>{car.plate_number}</td>
+                            <td>{car.year || "—"}</td>
+                            <td>
+                              <span className="category-badge">
+                                {car.category_name || "Uncategorized"}
+                              </span>
+                            </td>
+                            <td className="amount">{fmt(car.daily_rate)}/day</td>
+                            <td className="amount">{fmt(car.hourly_rate)}/hr</td>
+                            <td>
+                              <span className={`status-badge ${car.status}`}>
+                                {car.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── Owners Tab ── */}
+          {/* ════════════════════════════════════
+              OWNERS TAB
+          ════════════════════════════════════ */}
           {!loading && activeTab === "owners" && (
             <div className="tab-content">
+
               {/* Pending Owner Approvals */}
-              {pendingOwners.length > 0 && (
-                <div className="data-card">
-                  <div className="card-header">
-                    <h3>Pending Owner Approvals</h3>
-                    <span className="badge warning">
-                      {pendingOwners.length} Pending
-                    </span>
-                  </div>
-                  <div className="table-responsive">
-                    <table className="data-table">
-                      <thead>
+              <div className="data-card">
+                <div className="card-header">
+                  <h3>Pending Owner Approvals</h3>
+                  <span className="badge warning">{pendingOwners.length} Pending</span>
+                </div>
+                <div className="table-responsive">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Owner Name</th>
+                        <th>Email</th>
+                        <th>Mobile</th>
+                        <th>Registered</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingOwners.length === 0 ? (
                         <tr>
-                          <th>Owner Name</th>
-                          <th>Email</th>
-                          <th>Mobile</th>
-                          <th>Registered</th>
-                          <th>Status</th>
+                          <td colSpan={5} className="empty-state">
+                            No pending owner approvals
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {pendingOwners.map((owner) => (
+                      ) : (
+                        pendingOwners.map((owner) => (
                           <tr key={owner.id}>
                             <td>
                               <strong>{owner.name}</strong>
                             </td>
                             <td>{owner.email}</td>
-                            <td>{owner.mobile_no}</td>
+                            <td>{owner.mobile_no || "—"}</td>
                             <td>{fmtDate(owner.created_at)}</td>
                             <td>
                               <span className="status-badge pending">
@@ -529,12 +552,12 @@ export default function AdminDashboard() {
                               </span>
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              </div>
 
               {/* All Owners */}
               <div className="data-card">
@@ -546,7 +569,7 @@ export default function AdminDashboard() {
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Owner Name</th>
+                        <th>Owner</th>
                         <th>Contact</th>
                         <th>Email</th>
                         <th>Total Cars</th>
@@ -557,9 +580,7 @@ export default function AdminDashboard() {
                     <tbody>
                       {owners.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="empty-state">
-                            No owners found
-                          </td>
+                          <td colSpan={6} className="empty-state">No owners found</td>
                         </tr>
                       ) : (
                         owners.map((owner) => (
@@ -569,18 +590,17 @@ export default function AdminDashboard() {
                                 <div className="member-avatar">
                                   {owner.name?.charAt(0)}
                                 </div>
-                                <div className="member-name">{owner.name}</div>
+                                <div>
+                                  <div className="member-name">{owner.name}</div>
+                                  <div className="member-email">{owner.email}</div>
+                                </div>
                               </div>
                             </td>
-                            <td>{owner.mobile_no}</td>
+                            <td>{owner.mobile_no || "—"}</td>
                             <td>{owner.email}</td>
                             <td>{owner.total_cars || 0}</td>
                             <td>
-                              <span
-                                className={`status-badge ${
-                                  owner.status || "active"
-                                }`}
-                              >
+                              <span className={`status-badge ${owner.status || "active"}`}>
                                 {owner.status || "Active"}
                               </span>
                             </td>
@@ -595,7 +615,9 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ── Staff Tab ── */}
+          {/* ════════════════════════════════════
+              STAFF TAB
+          ════════════════════════════════════ */}
           {!loading && activeTab === "staff" && (
             <div className="tab-content">
               <div className="data-card">
@@ -607,7 +629,7 @@ export default function AdminDashboard() {
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Staff Member</th>
+                        <th>Member</th>
                         <th>Contact</th>
                         <th>Email</th>
                         <th>Role</th>
@@ -618,7 +640,7 @@ export default function AdminDashboard() {
                     <tbody>
                       {staff.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="empty-state">
+                          <td colSpan={6} className="empty-state">
                             No staff members found
                           </td>
                         </tr>
@@ -631,16 +653,12 @@ export default function AdminDashboard() {
                                   {member.name?.charAt(0)}
                                 </div>
                                 <div>
-                                  <div className="member-name">
-                                    {member.name}
-                                  </div>
-                                  <div className="member-email">
-                                    {member.email}
-                                  </div>
+                                  <div className="member-name">{member.name}</div>
+                                  <div className="member-email">{member.email}</div>
                                 </div>
                               </div>
                             </td>
-                            <td>{member.mobile_no}</td>
+                            <td>{member.mobile_no || "—"}</td>
                             <td>{member.email}</td>
                             <td>
                               <span className={`role-badge ${member.role}`}>
@@ -667,21 +685,48 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ── Payments Tab ── */}
+          {/* ════════════════════════════════════
+              PAYMENTS TAB
+          ════════════════════════════════════ */}
           {!loading && activeTab === "payments" && (
             <div className="tab-content">
+
+              {/* Summary Cards */}
+              <div className="stats-grid">
+                <div className="stat-card warning">
+                  <div className="stat-icon">⏳</div>
+                  <div className="stat-info">
+                    <span className="stat-label">Pending Payments</span>
+                    <span className="stat-value">{pendingPayments.length}</span>
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-icon">💰</div>
+                  <div className="stat-info">
+                    <span className="stat-label">Total Pending Amount</span>
+                    <span className="stat-value">
+                      {fmt(
+                        pendingPayments.reduce(
+                          (sum, p) => sum + Number(p.amount || 0),
+                          0
+                        )
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pending Payments Table */}
               <div className="data-card">
                 <div className="card-header">
                   <h3>Pending Owner Payments</h3>
-                  <span className="badge warning">
-                    {pendingPayments.length} Pending
-                  </span>
+                  <span className="badge warning">{pendingPayments.length} Pending</span>
                 </div>
                 <div className="table-responsive">
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Owner Name</th>
+                        <th>Owner</th>
                         <th>Branch</th>
                         <th>Amount</th>
                         <th>Due Date</th>
@@ -691,7 +736,7 @@ export default function AdminDashboard() {
                     <tbody>
                       {pendingPayments.length === 0 ? (
                         <tr>
-                          <td colSpan="5" className="empty-state">
+                          <td colSpan={5} className="empty-state">
                             No pending payments
                           </td>
                         </tr>
@@ -699,15 +744,18 @@ export default function AdminDashboard() {
                         pendingPayments.map((payment) => (
                           <tr key={payment.id}>
                             <td>
-                              <strong>{payment.owner_name}</strong>
+                              <div className="member-info">
+                                <div className="member-avatar">
+                                  {payment.owner_name?.charAt(0)}
+                                </div>
+                                <div className="member-name">{payment.owner_name}</div>
+                              </div>
                             </td>
-                            <td>{payment.branch_name}</td>
+                            <td>{payment.branch_name || "—"}</td>
                             <td className="amount">{fmt(payment.amount)}</td>
                             <td>{fmtDate(payment.due_date)}</td>
                             <td>
-                              <span className="status-badge pending">
-                                Pending
-                              </span>
+                              <span className="status-badge pending">Pending</span>
                             </td>
                           </tr>
                         ))
@@ -718,6 +766,7 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+
         </div>
       </div>
     </div>
