@@ -179,7 +179,7 @@ export default function SuperAdminDashboard() {
     if (!window.confirm("Are you sure you want to reject this car?")) return;
     try { 
       await rejectCar(id); 
-      showNotification("Car rejected"); 
+      showNotification("Car is rejected"); 
       loadData("approvals");
     } catch (e) { 
       showNotification(e.message, "error"); 
