@@ -51,7 +51,17 @@ const ChevronDown = () => (
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { token, user, role, isOwner, isAdmin, isBranchHead, isStaff, logout } = useAuth();
+  const auth = useAuth();
+  if (!auth) {
+    return (
+      <div className="lyt-shell">
+        <div style={{padding: '2rem', textAlign: 'center', color: '#666'}}>
+          Loading...
+        </div>
+      </div>
+    );
+  }
+  const { token, user, role, isOwner, isAdmin, isBranchHead, isStaff, logout } = auth;
   const loggedIn = !!token;
 
   const [scrolled, setScrolled] = useState(false);

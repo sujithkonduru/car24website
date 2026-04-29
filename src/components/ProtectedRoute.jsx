@@ -6,12 +6,14 @@ import { useAuth } from "../context/AuthContext.jsx";
  * redirectTo: where to send unauthenticated users (default /login).
  */
 export default function ProtectedRoute({ children, allowedRoles = "any", redirectTo = "/login" }) {
-  const { token, role } = useAuth();
+  const auth = useAuth();
   const location = useLocation();
 
-  if (!token) {
+  if (!auth || !auth.token) {
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
+
+  const { role } = auth;
 
   if (allowedRoles !== "any" && !allowedRoles.includes(role)) {
   // Redirect to correct portal based on actual role
