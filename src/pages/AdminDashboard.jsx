@@ -7,12 +7,12 @@ import {
   getBranchRevenue,
   getBranchStaff,
   getOwnerPendingBreakdown,
-  // getBranchOwners,
+  getBranchOwners,
+  getPendingOwnerRequests,
   // getBranchStats,
   // getCarCategories,
   // getBranchAnalytics,
   // getBranchFinancials,
-  // getPendingOwnerRequests,
 } from "../api.js";
 import "./AdminDashboard.css";
 
@@ -22,10 +22,10 @@ function fmt(n) {
 
 function fmtDate(d) {
   if (!d) return "N/A";
-  return new Date(d).toLocaleDateString("en-IN", { 
-    day: "numeric", 
-    month: "short", 
-    year: "numeric" 
+  return new Date(d).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   });
 }
 
@@ -45,21 +45,12 @@ export default function AdminDashboard() {
   const [owners, setOwners] = useState([]);
   const [stats, setStats] = useState(null);
   const [pendingPayments, setPendingPayments] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [analytics, setAnalytics] = useState(null);
-  const [financials, setFinancials] = useState(null);
   const [pendingOwners, setPendingOwners] = useState([]);
 
   // Filter states
-  const [bookingFilter, setBookingFilter] = useState({ 
-    status: "", 
-    search: "" 
-  });
-  
-  const [carFilter, setCarFilter] = useState({ 
-    category: "", 
-    status: "" 
-  });
+  const [bookingFilter, setBookingFilter] = useState({ status: "", search: "" });
+  const [carFilter, setCarFilter] = useState({ category: "", status: "" });
 
   function showNotification(text, type = "success") {
     setNotification({ text, type });
@@ -70,47 +61,46 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       if (activeTab === "overview") {
-        const [rev, stat, cat, anal, fin] = await Promise.allSettled([
+        // Only 1 call active — destructure only 1 variable
+        const [rev] = await Promise.allSettled([
           getBranchRevenue(),
           // getBranchStats(),
           // getCarCategories(),
           // getBranchAnalytics(),
-          // getBranchFinancials()
+          // getBranchFinancials(),
         ]);
         if (rev.status === "fulfilled") setRevenue(rev.value);
-        if (stat.status === "fulfilled") setStats(stat.value);
-        if (cat.status === "fulfilled") setCategories(cat.value?.data || cat.value || []);
-        if (anal.status === "fulfilled") setAnalytics(anal.value);
-        if (fin.status === "fulfilled") setFinancials(fin.value);
-        
+
         const bookingsData = await getBranchBookings({ limit: 5 });
         setBookings(bookingsData?.data || bookingsData || []);
       }
-      
+
       if (activeTab === "bookings") {
         const data = await getBranchBookings(bookingFilter);
         setBookings(data?.data || data || []);
       }
-      
+
       if (activeTab === "cars") {
         const data = await getBranchCars(carFilter);
         setCars(data?.data || data || []);
       }
-      
+
       if (activeTab === "staff") {
         const data = await getBranchStaff();
         setStaff(data?.data || data || []);
       }
-      
+
       if (activeTab === "owners") {
         const [ownersData, pendingData] = await Promise.allSettled([
           getBranchOwners(),
-          getPendingOwnerRequests()
+          getPendingOwnerRequests(),
         ]);
-        if (ownersData.status === "fulfilled") setOwners(ownersData.value?.data || ownersData.value || []);
-        if (pendingData.status === "fulfilled") setPendingOwners(pendingData.value?.data || pendingData.value || []);
+        if (ownersData.status === "fulfilled")
+          setOwners(ownersData.value?.data || ownersData.value || []);
+        if (pendingData.status === "fulfilled")
+          setPendingOwners(pendingData.value?.data || pendingData.value || []);
       }
-      
+
       if (activeTab === "payments") {
         const data = await getOwnerPendingBreakdown();
         setPendingPayments(data?.data || data || []);
@@ -142,7 +132,7 @@ export default function AdminDashboard() {
           <div className="logo">🚗 CarRental</div>
           <div className="role-badge">{user?.branch_name || "Admin"}</div>
         </div>
-        
+
         <nav className="sidebar-nav">
           {tabs.map((tab) => (
             <button
@@ -157,11 +147,11 @@ export default function AdminDashboard() {
         </nav>
 
         <div className="sidebar-footer">
-          <button 
-            className="nav-item logout" 
-            onClick={() => { 
-              logout(); 
-              navigate("/staff/login"); 
+          <button
+            className="nav-item logout"
+            onClick={() => {
+              logout();
+              navigate("/staff/login");
             }}
           >
             <span className="nav-icon">🚪</span>
@@ -175,15 +165,13 @@ export default function AdminDashboard() {
         {/* Top Bar */}
         <header className="top-bar">
           <div className="page-title">
-            <h1>{tabs.find(t => t.id === activeTab)?.label}</h1>
+            <h1>{tabs.find((t) => t.id === activeTab)?.label}</h1>
             <p className="breadcrumb">
-              Dashboard / {tabs.find(t => t.id === activeTab)?.label}
+              Dashboard / {tabs.find((t) => t.id === activeTab)?.label}
             </p>
           </div>
           <div className="user-info">
-            <div className="user-avatar">
-              {user?.name?.charAt(0) || "A"}
-            </div>
+            <div className="user-avatar">{user?.name?.charAt(0) || "A"}</div>
             <div className="user-details">
               <span className="user-name">{user?.name}</span>
               <span className="user-role">Branch Administrator (Read Only)</span>
@@ -207,7 +195,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Dashboard Overview Tab */}
+          {/* ── Overview Tab ── */}
           {!loading && activeTab === "overview" && (
             <div className="tab-content">
               {/* Stats Grid */}
@@ -215,28 +203,36 @@ export default function AdminDashboard() {
                 <div className="stat-card">
                   <div className="stat-icon">💰</div>
                   <div className="stat-info">
-                    <span className="stat-value">{fmt(revenue?.totalRevenue || 0)}</span>
+                    <span className="stat-value">
+                      {fmt(revenue?.totalRevenue || 0)}
+                    </span>
                     <span className="stat-label">Total Revenue</span>
                   </div>
                 </div>
                 <div className="stat-card">
                   <div className="stat-icon">📤</div>
                   <div className="stat-info">
-                    <span className="stat-value">{fmt(revenue?.branchProfit || 0)}</span>
+                    <span className="stat-value">
+                      {fmt(revenue?.branchProfit || 0)}
+                    </span>
                     <span className="stat-label">Branch Profit</span>
                   </div>
                 </div>
                 <div className="stat-card">
                   <div className="stat-icon">🚗</div>
                   <div className="stat-info">
-                    <span className="stat-value">{stats?.totalCars || cars.length || 0}</span>
+                    <span className="stat-value">
+                      {stats?.totalCars || cars.length || 0}
+                    </span>
                     <span className="stat-label">Total Cars</span>
                   </div>
                 </div>
                 <div className="stat-card">
                   <div className="stat-icon">📅</div>
                   <div className="stat-info">
-                    <span className="stat-value">{stats?.totalBookings || bookings.length || 0}</span>
+                    <span className="stat-value">
+                      {stats?.totalBookings || bookings.length || 0}
+                    </span>
                     <span className="stat-label">Total Bookings</span>
                   </div>
                 </div>
@@ -247,24 +243,38 @@ export default function AdminDashboard() {
                 <div className="data-card">
                   <div className="card-header">
                     <h3>Branch Analytics</h3>
-                    <button className="btn-icon" disabled style={{ opacity: 0.5 }}>📈</button>
+                    <button
+                      className="btn-icon"
+                      disabled
+                      style={{ opacity: 0.5 }}
+                    >
+                      📈
+                    </button>
                   </div>
                   <div className="analytics-grid">
                     <div className="analytics-item">
                       <span className="analytics-label">Active Bookings</span>
-                      <span className="analytics-value">{analytics.activeBookings || 0}</span>
+                      <span className="analytics-value">
+                        {analytics.activeBookings || 0}
+                      </span>
                     </div>
                     <div className="analytics-item">
                       <span className="analytics-label">Available Cars</span>
-                      <span className="analytics-value">{analytics.availableCars || 0}</span>
+                      <span className="analytics-value">
+                        {analytics.availableCars || 0}
+                      </span>
                     </div>
                     <div className="analytics-item">
                       <span className="analytics-label">Utilization Rate</span>
-                      <span className="analytics-value">{analytics.utilizationRate || 0}%</span>
+                      <span className="analytics-value">
+                        {analytics.utilizationRate || 0}%
+                      </span>
                     </div>
                     <div className="analytics-item">
                       <span className="analytics-label">Avg. Daily Revenue</span>
-                      <span className="analytics-value">{fmt(analytics.avgDailyRevenue || 0)}</span>
+                      <span className="analytics-value">
+                        {fmt(analytics.avgDailyRevenue || 0)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -275,8 +285,8 @@ export default function AdminDashboard() {
                 <div className="data-card">
                   <div className="card-header">
                     <h3>Recent Bookings</h3>
-                    <button 
-                      className="btn-text" 
+                    <button
+                      className="btn-text"
                       onClick={() => setActiveTab("bookings")}
                     >
                       View All →
@@ -317,7 +327,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Bookings Tab - Read Only */}
+          {/* ── Bookings Tab ── */}
           {!loading && activeTab === "bookings" && (
             <div className="tab-content">
               <div className="data-card">
@@ -326,7 +336,12 @@ export default function AdminDashboard() {
                   <div className="filter-bar">
                     <select
                       value={bookingFilter.status}
-                      onChange={(e) => setBookingFilter({ ...bookingFilter, status: e.target.value })}
+                      onChange={(e) =>
+                        setBookingFilter({
+                          ...bookingFilter,
+                          status: e.target.value,
+                        })
+                      }
                       className="filter-select"
                     >
                       <option value="">All Status</option>
@@ -340,10 +355,17 @@ export default function AdminDashboard() {
                       type="text"
                       placeholder="Search customer..."
                       value={bookingFilter.search}
-                      onChange={(e) => setBookingFilter({ ...bookingFilter, search: e.target.value })}
+                      onChange={(e) =>
+                        setBookingFilter({
+                          ...bookingFilter,
+                          search: e.target.value,
+                        })
+                      }
                       className="filter-input"
                     />
-                    <button className="btn-primary" onClick={loadData}>Apply Filter</button>
+                    <button className="btn-primary" onClick={loadData}>
+                      Apply Filter
+                    </button>
                   </div>
                 </div>
                 <div className="table-responsive">
@@ -362,7 +384,9 @@ export default function AdminDashboard() {
                     <tbody>
                       {bookings.length === 0 ? (
                         <tr>
-                          <td colSpan="7" className="empty-state">No bookings found</td>
+                          <td colSpan="7" className="empty-state">
+                            No bookings found
+                          </td>
                         </tr>
                       ) : (
                         bookings.map((booking) => (
@@ -371,7 +395,9 @@ export default function AdminDashboard() {
                             <td>
                               <div>
                                 <div>{booking.customer_name}</div>
-                                <small className="text-muted">{booking.customer_phone}</small>
+                                <small className="text-muted">
+                                  {booking.customer_phone}
+                                </small>
                               </div>
                             </td>
                             <td>{booking.car_model}</td>
@@ -379,7 +405,9 @@ export default function AdminDashboard() {
                             <td>{fmtDate(booking.return_date)}</td>
                             <td className="amount">{fmt(booking.amount)}</td>
                             <td>
-                              <span className={`status-badge ${booking.status}`}>
+                              <span
+                                className={`status-badge ${booking.status}`}
+                              >
                                 {booking.status}
                               </span>
                             </td>
@@ -393,7 +421,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Cars / Fleet Tab - Read Only */}
+          {/* ── Cars / Fleet Tab ── */}
           {!loading && activeTab === "cars" && (
             <div className="tab-content">
               <div className="data-card">
@@ -401,12 +429,13 @@ export default function AdminDashboard() {
                   <h3>Fleet Management</h3>
                   <span className="badge info">Read Only Mode</span>
                 </div>
-                
-                {/* Filters */}
+
                 <div className="filter-bar" style={{ marginBottom: "1rem" }}>
                   <select
                     value={carFilter.status}
-                    onChange={(e) => setCarFilter({ ...carFilter, status: e.target.value })}
+                    onChange={(e) =>
+                      setCarFilter({ ...carFilter, status: e.target.value })
+                    }
                     className="filter-select"
                   >
                     <option value="">All Status</option>
@@ -414,10 +443,11 @@ export default function AdminDashboard() {
                     <option value="rented">Rented</option>
                     <option value="maintenance">Maintenance</option>
                   </select>
-                  <button className="btn-primary" onClick={loadData}>Filter</button>
+                  <button className="btn-primary" onClick={loadData}>
+                    Filter
+                  </button>
                 </div>
 
-                {/* Cars Grid - No edit/delete buttons */}
                 <div className="cars-grid">
                   {cars.length === 0 ? (
                     <div className="empty-state">No cars found</div>
@@ -426,18 +456,28 @@ export default function AdminDashboard() {
                       <div key={car.id} className="car-card">
                         <div className="car-image">
                           <div className="car-placeholder">🚗</div>
-                          <span className={`car-status ${car.status}`}>{car.status}</span>
+                          <span className={`car-status ${car.status}`}>
+                            {car.status}
+                          </span>
                         </div>
                         <div className="car-details">
-                          <h4>{car.brand} {car.model}</h4>
+                          <h4>
+                            {car.brand} {car.model}
+                          </h4>
                           <p className="car-plate">{car.plate_number}</p>
                           <div className="car-specs">
                             <span>📅 {car.year || "N/A"}</span>
-                            <span>🏷️ {car.category_name || "Uncategorized"}</span>
+                            <span>
+                              🏷️ {car.category_name || "Uncategorized"}
+                            </span>
                           </div>
                           <div className="car-pricing">
-                            <span className="price">{fmt(car.daily_rate)}/day</span>
-                            <span className="price">{fmt(car.hourly_rate)}/hr</span>
+                            <span className="price">
+                              {fmt(car.daily_rate)}/day
+                            </span>
+                            <span className="price">
+                              {fmt(car.hourly_rate)}/hr
+                            </span>
                           </div>
                           <div className="car-actions-readonly">
                             <span className="readonly-badge">View Only</span>
@@ -451,15 +491,17 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Owners Tab - Read Only */}
+          {/* ── Owners Tab ── */}
           {!loading && activeTab === "owners" && (
             <div className="tab-content">
-              {/* Pending Owner Approvals - Read Only */}
+              {/* Pending Owner Approvals */}
               {pendingOwners.length > 0 && (
                 <div className="data-card">
                   <div className="card-header">
                     <h3>Pending Owner Approvals</h3>
-                    <span className="badge warning">{pendingOwners.length} Pending</span>
+                    <span className="badge warning">
+                      {pendingOwners.length} Pending
+                    </span>
                   </div>
                   <div className="table-responsive">
                     <table className="data-table">
@@ -475,12 +517,16 @@ export default function AdminDashboard() {
                       <tbody>
                         {pendingOwners.map((owner) => (
                           <tr key={owner.id}>
-                            <td><strong>{owner.name}</strong></td>
+                            <td>
+                              <strong>{owner.name}</strong>
+                            </td>
                             <td>{owner.email}</td>
                             <td>{owner.mobile_no}</td>
                             <td>{fmtDate(owner.created_at)}</td>
                             <td>
-                              <span className="status-badge pending">Pending Approval</span>
+                              <span className="status-badge pending">
+                                Pending Approval
+                              </span>
                             </td>
                           </tr>
                         ))}
@@ -511,24 +557,30 @@ export default function AdminDashboard() {
                     <tbody>
                       {owners.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="empty-state">No owners found</td>
+                          <td colSpan="6" className="empty-state">
+                            No owners found
+                          </td>
                         </tr>
                       ) : (
                         owners.map((owner) => (
                           <tr key={owner.id}>
                             <td>
                               <div className="member-info">
-                                <div className="member-avatar">{owner.name?.charAt(0)}</div>
-                                <div>
-                                  <div className="member-name">{owner.name}</div>
+                                <div className="member-avatar">
+                                  {owner.name?.charAt(0)}
                                 </div>
+                                <div className="member-name">{owner.name}</div>
                               </div>
                             </td>
                             <td>{owner.mobile_no}</td>
                             <td>{owner.email}</td>
                             <td>{owner.total_cars || 0}</td>
                             <td>
-                              <span className={`status-badge ${owner.status || "active"}`}>
+                              <span
+                                className={`status-badge ${
+                                  owner.status || "active"
+                                }`}
+                              >
                                 {owner.status || "Active"}
                               </span>
                             </td>
@@ -543,7 +595,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Staff Tab - Read Only */}
+          {/* ── Staff Tab ── */}
           {!loading && activeTab === "staff" && (
             <div className="tab-content">
               <div className="data-card">
@@ -566,17 +618,25 @@ export default function AdminDashboard() {
                     <tbody>
                       {staff.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="empty-state">No staff members found</td>
+                          <td colSpan="6" className="empty-state">
+                            No staff members found
+                          </td>
                         </tr>
                       ) : (
                         staff.map((member) => (
                           <tr key={member.id}>
                             <td>
                               <div className="member-info">
-                                <div className="member-avatar">{member.name?.charAt(0)}</div>
+                                <div className="member-avatar">
+                                  {member.name?.charAt(0)}
+                                </div>
                                 <div>
-                                  <div className="member-name">{member.name}</div>
-                                  <div className="member-email">{member.email}</div>
+                                  <div className="member-name">
+                                    {member.name}
+                                  </div>
+                                  <div className="member-email">
+                                    {member.email}
+                                  </div>
                                 </div>
                               </div>
                             </td>
@@ -588,7 +648,11 @@ export default function AdminDashboard() {
                               </span>
                             </td>
                             <td>
-                              <span className={`status-badge ${member.is_verified ? "active" : "pending"}`}>
+                              <span
+                                className={`status-badge ${
+                                  member.is_verified ? "active" : "pending"
+                                }`}
+                              >
                                 {member.is_verified ? "Verified" : "Pending"}
                               </span>
                             </td>
@@ -603,13 +667,15 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Payments Tab - Read Only */}
+          {/* ── Payments Tab ── */}
           {!loading && activeTab === "payments" && (
             <div className="tab-content">
               <div className="data-card">
                 <div className="card-header">
                   <h3>Pending Owner Payments</h3>
-                  <span className="badge warning">{pendingPayments.length} Pending</span>
+                  <span className="badge warning">
+                    {pendingPayments.length} Pending
+                  </span>
                 </div>
                 <div className="table-responsive">
                   <table className="data-table">
@@ -625,17 +691,23 @@ export default function AdminDashboard() {
                     <tbody>
                       {pendingPayments.length === 0 ? (
                         <tr>
-                          <td colSpan="5" className="empty-state">No pending payments</td>
+                          <td colSpan="5" className="empty-state">
+                            No pending payments
+                          </td>
                         </tr>
                       ) : (
                         pendingPayments.map((payment) => (
                           <tr key={payment.id}>
-                            <td><strong>{payment.owner_name}</strong></td>
+                            <td>
+                              <strong>{payment.owner_name}</strong>
+                            </td>
                             <td>{payment.branch_name}</td>
                             <td className="amount">{fmt(payment.amount)}</td>
                             <td>{fmtDate(payment.due_date)}</td>
                             <td>
-                              <span className="status-badge pending">Pending</span>
+                              <span className="status-badge pending">
+                                Pending
+                              </span>
                             </td>
                           </tr>
                         ))

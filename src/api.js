@@ -641,7 +641,7 @@ export async function endRide(bookingId, data) {
 }
 
 export async function uploadOwnerDocument(formData) {
-  return apiPost("/PhotoUpload/DocumentUpload", formData, { withAuth: true });
+  return apiPost("/photoUpload/DocumentUpload", formData, { withAuth: true });
 }
 
 export async function createManagement(data) {

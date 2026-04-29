@@ -5,7 +5,7 @@ import "../Layout.css";
 import logo from "../images/Car 24 logo (1).png";
 
 const WHATSAPP = "6281704664";
-const INSTAGRAM = "https://www.instagram.com/cars24india/";
+const INSTAGRAM = "#";
 const PHONE = "6281704664";
 
 const ROLE_LABEL = {

@@ -83,6 +83,23 @@ export default defineConfig({
             }
           });
         }
+      },
+      '/photoUpload': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            if (req.headers.authorization) {
+              proxyReq.setHeader('Authorization', req.headers.authorization);
+            }
+            if (req.headers['x-branch-id']) {
+              proxyReq.setHeader('X-Branch-Id', req.headers['x-branch-id']);
+            }
+            if (req.headers['x-branch-head-id']) {
+              proxyReq.setHeader('X-Branch-Head-Id', req.headers['x-branch-head-id']);
+            }
+          });
+        }
       }
     }
   },

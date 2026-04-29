@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getStaffTasks, verifyCarKey, startRide, endRide, collectRemainingPayment, getBookingDetails } from "../api.js";
-import { Search, Clock, TrendingUp, CheckCircle, Users, Calendar, Activity, Download, User, Wallet, CreditCard, IndianRupee, Smartphone, Banknote, Receipt, Printer } from 'lucide-react';
+import { Search, Clock, TrendingUp, CheckCircle, Users, Calendar, Activity, Download, User, Wallet, CreditCard, IndianRupee, Smartphone, Banknote, Receipt, Printer, ChevronDown, ChevronUp } from 'lucide-react';
 import UserProfileModal from "../components/UserProfileModal.jsx";
 import { printBookingReceipt } from "../utils/receiptUtils.js";
 import "./StaffDashboard.css";
@@ -45,6 +45,25 @@ function formatElapsed(isoString) {
   } else {
     return `${seconds}s`;
   }
+}
+
+// Function to calculate rental duration
+function calculateDuration(pickupDate, dropoffDate) {
+  if (!pickupDate || !dropoffDate) return "—";
+  const start = new Date(pickupDate);
+  const end = new Date(dropoffDate);
+  const diffMs = end - start;
+  const diffHours = diffMs / (1000 * 60 * 60);
+  
+  if (diffHours >= 24) {
+    const days = Math.floor(diffHours / 24);
+    const remainingHours = diffHours % 24;
+    if (remainingHours > 0) {
+      return `${days}d ${Math.round(remainingHours)}h`;
+    }
+    return `${days}d`;
+  }
+  return `${Math.round(diffHours)}h`;
 }
 
 export default function StaffDashboard() {
@@ -92,6 +111,9 @@ export default function StaffDashboard() {
   // Filter and search state
   const [bookingFilter, setBookingFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Expanded rows for user details
+  const [expandedUsers, setExpandedUsers] = useState({});
 
   // Live timer state
   const [elapsedTimes, setElapsedTimes] = useState({});
@@ -127,8 +149,12 @@ export default function StaffDashboard() {
                 dropoffDate: bookingDetails.dropoffDate || task.dropoffDate,
                 customer_name: bookingDetails.user?.name || task.customer_name,
                 customer_phone: bookingDetails.user?.mobileNo || task.customer_phone,
+                customer_email: bookingDetails.user?.email || task.customer_email,
                 car_model: bookingDetails.car?.model || task.car_model,
-                car_plate: bookingDetails.car?.licensePlate || task.car_plate
+                car_plate: bookingDetails.car?.licensePlate || task.car_plate,
+                car_brand: bookingDetails.car?.brand || task.car_brand,
+                duration: calculateDuration(bookingDetails.pickupDate, bookingDetails.dropoffDate),
+                rentalType: bookingDetails.rentalType || task.rentalType || "daily"
               };
             } catch (err) {
               console.warn(`Failed to fetch booking details for ${task.booking_id}:`, err.message);
@@ -136,7 +162,8 @@ export default function StaffDashboard() {
                 ...task,
                 totalPrice: task.totalPrice || task.total_amount || 0,
                 advance_paid: task.advance_paid || 0,
-                remaining_amount: task.remaining_amount || 0
+                remaining_amount: task.remaining_amount || 0,
+                duration: calculateDuration(task.pickupDate, task.dropoffDate),
               };
             }
           })
@@ -171,6 +198,42 @@ export default function StaffDashboard() {
     return getTotalAmount(task) - getAdvancePaid(task);
   };
 
+  // Group tasks by customer for individual user view
+  const groupedByCustomer = useMemo(() => {
+    const grouped = {};
+    tasks.forEach(task => {
+      const customerKey = task.customer_name || task.customer_phone || `Customer_${task.user_id}`;
+      if (!grouped[customerKey]) {
+        grouped[customerKey] = {
+          customerName: task.customer_name || "Unknown Customer",
+          customerPhone: task.customer_phone || "—",
+          customerEmail: task.customer_email || "—",
+          userId: task.user_id,
+          bookings: [],
+          totalAmount: 0,
+          totalAdvancePaid: 0,
+          totalRemaining: 0
+        };
+      }
+      const totalAmount = getTotalAmount(task);
+      const advancePaid = getAdvancePaid(task);
+      const remaining = getRemainingAmount(task);
+      
+      grouped[customerKey].bookings.push({
+        ...task,
+        totalAmount,
+        advancePaid,
+        remaining,
+        carDisplay: `${task.car_brand || ""} ${task.car_model || ""}`.trim() || task.car_model || "Unknown Car"
+      });
+      grouped[customerKey].totalAmount += totalAmount;
+      grouped[customerKey].totalAdvancePaid += advancePaid;
+      grouped[customerKey].totalRemaining += Math.max(0, remaining);
+    });
+    return Object.values(grouped);
+  }, [tasks]);
+
+  // Overall totals
   const totalAmount = useMemo(() => 
     tasks.reduce((sum, t) => sum + getTotalAmount(t), 0)
   , [tasks]);
@@ -182,6 +245,26 @@ export default function StaffDashboard() {
   const pendingCollection = useMemo(() => 
     tasks.reduce((sum, t) => sum + Math.max(0, getRemainingAmount(t)), 0)
   , [tasks]);
+
+  // Individual stats for overview cards
+  const individualStats = useMemo(() => {
+    return groupedByCustomer.map(customer => ({
+      name: customer.customerName,
+      phone: customer.customerPhone,
+      totalAmount: customer.totalAmount,
+      advancePaid: customer.totalAdvancePaid,
+      remaining: customer.totalRemaining,
+      bookingCount: customer.bookings.length
+    }));
+  }, [groupedByCustomer]);
+
+  // Toggle expand for user details
+  const toggleUserExpand = (customerName) => {
+    setExpandedUsers(prev => ({
+      ...prev,
+      [customerName]: !prev[customerName]
+    }));
+  };
 
   // Live timer updates
   useEffect(() => {
@@ -355,13 +438,11 @@ export default function StaffDashboard() {
         collectedAt: new Date().toISOString()
       };
 
-      // Call API to record offline payment
       const response = await collectRemainingPayment(paymentData);
 
       if (response.success) {
         alert(`Payment of ${formatCurrency(offlinePaymentData.remainingAmount)} collected successfully via ${offlinePaymentForm.paymentMethod === 'cash' ? 'Cash' : 'UPI'}!`);
         
-        // Print receipt
         await printReceipt({
           ...offlinePaymentData,
           paymentMethod: offlinePaymentForm.paymentMethod,
@@ -402,7 +483,8 @@ export default function StaffDashboard() {
           paymentMethod: paymentInfo.paymentMethod === 'cash' ? 'Cash' : 'UPI',
           transactionId: paymentInfo.transactionId,
           paymentDate: new Date().toLocaleString(),
-          collectedBy: user?.name || "Staff"
+          collectedBy: user?.name || "Staff",
+          duration: booking.duration
         });
       }
     } catch (err) {
@@ -518,7 +600,7 @@ export default function StaffDashboard() {
 
   return (
     <div className="sdb-root">
-      {/* Header remains same */}
+      {/* Header */}
       <div className="sdb-header">
         <div>
           <p className="sdb-eyebrow">
@@ -550,6 +632,10 @@ export default function StaffDashboard() {
         <button className={`sdb-tab${activeTab === "overview" ? " active" : ""}`} onClick={() => setActiveTab("overview")}>
           Overview
         </button>
+        <button className={`sdb-tab${activeTab === "customers" ? " active" : ""}`} onClick={() => setActiveTab("customers")}>
+          Customers
+          <span className="sdb-tab-badge">{groupedByCustomer.length}</span>
+        </button>
         <button className={`sdb-tab${activeTab === "bookings" ? " active" : ""}`} onClick={() => setActiveTab("bookings")}>
           Bookings
           <span className="sdb-tab-badge">{tasks.length}</span>
@@ -565,13 +651,22 @@ export default function StaffDashboard() {
         </button>
       </div>
 
-      {/* Overview Tab - Add offline payment info */}
+      {/* Overview Tab - Individual User Stats */}
       {activeTab === "overview" && (
         <div className="sdb-panel">
+          {/* Summary Stats Grid */}
           <div className="sdb-stats-grid">
-            {/* Existing stat cards */}
             <div className="sdb-stat-card">
               <div className="sdb-stat-icon" style={{ background: "#fbbf2420", color: "#fbbf24" }}>
+                <Users size={24} />
+              </div>
+              <div className="sdb-stat-content">
+                <span className="sdb-stat-value">{groupedByCustomer.length}</span>
+                <span className="sdb-stat-label">Total Customers</span>
+              </div>
+            </div>
+            <div className="sdb-stat-card">
+              <div className="sdb-stat-icon" style={{ background: "#14b8a620", color: "#14b8a6" }}>
                 <Clock size={24} />
               </div>
               <div className="sdb-stat-content">
@@ -580,7 +675,7 @@ export default function StaffDashboard() {
               </div>
             </div>
             <div className="sdb-stat-card">
-              <div className="sdb-stat-icon" style={{ background: "#14b8a620", color: "#14b8a6" }}>
+              <div className="sdb-stat-icon" style={{ background: "#3b82f620", color: "#3b82f6" }}>
                 <TrendingUp size={24} />
               </div>
               <div className="sdb-stat-content">
@@ -597,41 +692,42 @@ export default function StaffDashboard() {
                 <span className="sdb-stat-label">Completed Rides</span>
               </div>
             </div>
-            <div className="sdb-stat-card">
-              <div className="sdb-stat-icon" style={{ background: "#3b82f620", color: "#3b82f6" }}>
-                <Users size={24} />
-              </div>
-              <div className="sdb-stat-content">
-                <span className="sdb-stat-value">{tasks.length}</span>
-                <span className="sdb-stat-label">Total Tasks</span>
-              </div>
-            </div>
-            <div className="sdb-stat-card">
-              <div className="sdb-stat-icon" style={{ background: "#8b5cf620", color: "#8b5cf6" }}>
-                <Wallet size={24} />
-              </div>
-              <div className="sdb-stat-content">
-                <span className="sdb-stat-value">{formatCurrency(totalAmount)}</span>
-                <span className="sdb-stat-label">Total Amount</span>
-              </div>
-            </div>
-            <div className="sdb-stat-card">
-              <div className="sdb-stat-icon" style={{ background: "#10b98120", color: "#10b981" }}>
-                <CreditCard size={24} />
-              </div>
-              <div className="sdb-stat-content">
-                <span className="sdb-stat-value">{formatCurrency(advancePaid)}</span>
-                <span className="sdb-stat-label">Advance Paid</span>
-              </div>
-            </div>
-            <div className="sdb-stat-card">
-              <div className="sdb-stat-icon" style={{ background: "#f59e2020", color: "#f59e20" }}>
-                <IndianRupee size={24} />
-              </div>
-              <div className="sdb-stat-content">
-                <span className={`sdb-stat-value ${pendingCollection > 0 ? 'text-warning' : ''}`}>{formatCurrency(pendingCollection)}</span>
-                <span className="sdb-stat-label">Pending Collection</span>
-              </div>
+          </div>
+
+          {/* Individual Customer Summary Cards */}
+          <div className="sdb-section">
+            <h2 className="sdb-section-title">Customer Payment Summary</h2>
+            <div className="customer-summary-grid">
+              {individualStats.map((customer, idx) => (
+                <div key={idx} className="customer-summary-card">
+                  <div className="customer-header">
+                    <div className="customer-avatar">
+                      {customer.name?.charAt(0)?.toUpperCase() || "C"}
+                    </div>
+                    <div className="customer-info">
+                      <h4>{customer.name}</h4>
+                      <p className="customer-phone">{customer.phone}</p>
+                      <span className="booking-count">{customer.bookingCount} booking(s)</span>
+                    </div>
+                  </div>
+                  <div className="customer-payment-details">
+                    <div className="payment-row">
+                      <span>💰 Total Amount:</span>
+                      <strong>{formatCurrency(customer.totalAmount)}</strong>
+                    </div>
+                    <div className="payment-row paid">
+                      <span>✅ Advance Paid:</span>
+                      <strong className="text-success">{formatCurrency(customer.advancePaid)}</strong>
+                    </div>
+                    <div className="payment-row">
+                      <span>⏳ Remaining:</span>
+                      <strong className={customer.remaining > 0 ? "text-warning" : "text-success"}>
+                        {formatCurrency(customer.remaining)}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -646,7 +742,162 @@ export default function StaffDashboard() {
         </div>
       )}
 
-      {/* Bookings Tab - Add offline payment indicator */}
+      {/* Customers Tab - Detailed Individual View */}
+      {activeTab === "customers" && (
+        <div className="sdb-panel">
+          <div className="sdb-section-header">
+            <h2 className="sdb-section-title">Customer-wise Bookings</h2>
+            <div className="sdb-search-bar" style={{ marginBottom: 0, width: "300px" }}>
+              <Search size={18} />
+              <input
+                type="text"
+                placeholder="Search customer..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {tasksLoading ? (
+            <div className="sdb-loading">Loading customers...</div>
+          ) : groupedByCustomer.length === 0 ? (
+            <div className="sdb-empty-state">
+              <Users size={48} />
+              <p>No customers found</p>
+            </div>
+          ) : (
+            <div className="customer-accordion">
+              {groupedByCustomer
+                .filter(customer => 
+                  customer.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  customer.customerPhone.includes(searchTerm)
+                )
+                .map((customer) => (
+                  <div key={customer.customerName} className="customer-accordion-item">
+                    <div className="customer-accordion-header" onClick={() => toggleUserExpand(customer.customerName)}>
+                      <div className="customer-info-summary">
+                        <div className="customer-avatar-large">
+                          {customer.customerName?.charAt(0)?.toUpperCase() || "C"}
+                        </div>
+                        <div className="customer-details-summary">
+                          <h3>{customer.customerName}</h3>
+                          <div className="customer-contact">
+                            <span>📞 {customer.customerPhone}</span>
+                            <span>✉️ {customer.customerEmail}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="customer-stats-summary">
+                        <div className="stat-badge">
+                          <span className="stat-label">Total</span>
+                          <span className="stat-value">{formatCurrency(customer.totalAmount)}</span>
+                        </div>
+                        <div className="stat-badge paid">
+                          <span className="stat-label">Paid</span>
+                          <span className="stat-value">{formatCurrency(customer.totalAdvancePaid)}</span>
+                        </div>
+                        <div className={`stat-badge ${customer.totalRemaining > 0 ? 'pending' : 'completed'}`}>
+                          <span className="stat-label">Remaining</span>
+                          <span className="stat-value">{formatCurrency(customer.totalRemaining)}</span>
+                        </div>
+                        {expandedUsers[customer.customerName] ? (
+                          <ChevronUp size={20} />
+                        ) : (
+                          <ChevronDown size={20} />
+                        )}
+                      </div>
+                    </div>
+                    
+                    {expandedUsers[customer.customerName] && (
+                      <div className="customer-accordion-content">
+                        <div className="bookings-list">
+                          <h4>Booking History</h4>
+                          <table className="bookings-detail-table">
+                            <thead>
+                              <tr>
+                                <th>Booking ID</th>
+                                <th>Car Model</th>
+                                <th>Plate Number</th>
+                                <th>Duration</th>
+                                <th>Pickup Date</th>
+                                <th>Dropoff Date</th>
+                                <th>Total Amount</th>
+                                <th>Advance Paid</th>
+                                <th>Remaining</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {customer.bookings.map((booking) => {
+                                const status = !booking.ride_start_time ? "pending" :
+                                  booking.ride_start_time && !booking.ride_end_time ? "active" : "completed";
+                                return (
+                                  <tr key={booking.booking_id}>
+                                    <td>#{booking.booking_id}</td>
+                                    <td>
+                                      <strong>{booking.carDisplay}</strong>
+                                      <small>{booking.car_brand}</small>
+                                    </td>
+                                    <td>{booking.car_plate || "—"}</td>
+                                    <td>{booking.duration || "—"}</td>
+                                    <td>{formatDt(booking.pickupDate)}</td>
+                                    <td>{formatDt(booking.dropoffDate)}</td>
+                                    <td className="amount">{formatCurrency(booking.totalAmount)}</td>
+                                    <td className="amount paid">{formatCurrency(booking.advancePaid)}</td>
+                                    <td className={`amount ${booking.remaining > 0 ? 'warning' : 'success'}`}>
+                                      {formatCurrency(booking.remaining)}
+                                    </td>
+                                    <td>
+                                      <span className={`status-badge status-${status}`}>
+                                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      {status === "pending" && (
+                                        <button
+                                          className="btn-small primary"
+                                          onClick={() => prefillVerify(booking.booking_id)}
+                                        >
+                                          Verify
+                                        </button>
+                                      )}
+                                      {status === "active" && (
+                                        <button
+                                          className="btn-small danger"
+                                          onClick={() => prefillEndRide(booking.booking_id, booking)}
+                                        >
+                                          End Ride
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot>
+                              <tr className="total-row">
+                                <td colSpan="6"><strong>Total Summary</strong></td>
+                                <td className="amount"><strong>{formatCurrency(customer.totalAmount)}</strong></td>
+                                <td className="amount paid"><strong>{formatCurrency(customer.totalAdvancePaid)}</strong></td>
+                                <td className={`amount ${customer.totalRemaining > 0 ? 'warning' : 'success'}`}>
+                                  <strong>{formatCurrency(customer.totalRemaining)}</strong>
+                                </td>
+                                <td colSpan="2"></td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bookings Tab */}
       {activeTab === "bookings" && (
         <div className="sdb-panel">
           <div className="sdb-section-header">
@@ -677,7 +928,18 @@ export default function StaffDashboard() {
             <div className="sdb-bookings-table">
               <table className="data-table">
                 <thead>
-                  <tr><th>ID</th><th>Customer</th><th>Car</th><th>Pickup</th><th>Amount Details</th><th>Status</th><th>Actions</th></tr>
+                  <tr>
+                    <th>ID</th>
+                    <th>Customer</th>
+                    <th>Car</th>
+                    <th>Duration</th>
+                    <th>Pickup</th>
+                    <th>Total</th>
+                    <th>Paid</th>
+                    <th>Remaining</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {tasks
@@ -703,17 +965,26 @@ export default function StaffDashboard() {
                       return (
                         <tr key={task.booking_id}>
                           <td>#{task.booking_id}</td>
-                          <td><strong>{task.customer_name}</strong><small>{task.customer_phone || "—"}</small></td>
-                          <td>{task.car_model}<small>{task.car_plate}</small></td>
-                          <td>{formatDt(task.pickupDate)}</td>
-                          <td className="amount-cell">
-                            <div className="amount-details">
-                              <div className="amount-row total"><span>Total:</span><strong>{formatCurrency(totalAmount)}</strong></div>
-                              <div className="amount-row paid"><span>Paid:</span><span>{formatCurrency(advancePaidAmount)}</span></div>
-                              <div className="amount-row remaining"><span>Remaining:</span><strong className={remainingAmount > 0 ? 'text-warning' : 'text-success'}>{formatCurrency(remainingAmount)}</strong></div>
-                            </div>
+                          <td>
+                            <strong>{task.customer_name}</strong>
+                            <small>{task.customer_phone || "—"}</small>
                           </td>
-                          <td><span className={`sdb-status-badge sdb-status-badge-${status}`}>{status.charAt(0).toUpperCase() + status.slice(1)}</span></td>
+                          <td>
+                            {task.car_model}
+                            <small>{task.car_plate}</small>
+                          </td>
+                          <td>{task.duration || calculateDuration(task.pickupDate, task.dropoffDate)}</td>
+                          <td>{formatDt(task.pickupDate)}</td>
+                          <td className="amount">{formatCurrency(totalAmount)}</td>
+                          <td className="amount paid">{formatCurrency(advancePaidAmount)}</td>
+                          <td className={`amount ${remainingAmount > 0 ? 'warning' : 'success'}`}>
+                            {formatCurrency(remainingAmount)}
+                          </td>
+                          <td>
+                            <span className={`sdb-status-badge sdb-status-badge-${status}`}>
+                              {status.charAt(0).toUpperCase() + status.slice(1)}
+                            </span>
+                          </td>
                           <td className="sdb-actions">
                             <button className="sdb-btn-small primary" onClick={() => prefillVerify(task.booking_id)}>Verify</button>
                             {status === "active" && (
@@ -730,7 +1001,7 @@ export default function StaffDashboard() {
         </div>
       )}
 
-      {/* Tasks Tab remains largely the same */}
+      {/* Tasks Tab */}
       {activeTab === "tasks" && (
         <div className="sdb-panel">
           {tasksError && <p className="banner error">{tasksError}</p>}
@@ -748,16 +1019,30 @@ export default function StaffDashboard() {
                       const remainingAmount = getRemainingAmount(t);
                       return (
                         <div key={t.booking_id} className="sdb-task-card">
-                          <div className="sdb-task-top"><div><p className="sdb-task-car">{t.car_model}</p><p className="sdb-task-plate">{t.car_plate}</p></div><span className="sdb-status-pill sdb-status-pill--pending">Pending Pickup</span></div>
-                          <div className="sdb-task-meta"><span>👤 {t.customer_name}</span><span>🕐 {formatDt(t.pickupDate)}</span><span>🚩 Until {formatDt(t.dropoffDate)}</span><span>Booking #{t.booking_id}</span></div>
+                          <div className="sdb-task-top">
+                            <div>
+                              <p className="sdb-task-car">{t.car_model}</p>
+                              <p className="sdb-task-plate">{t.car_plate}</p>
+                              <p className="sdb-task-duration">📅 {t.duration || calculateDuration(t.pickupDate, t.dropoffDate)}</p>
+                            </div>
+                            <span className="sdb-status-pill sdb-status-pill--pending">Pending Pickup</span>
+                          </div>
+                          <div className="sdb-task-meta">
+                            <span>👤 {t.customer_name}</span>
+                            <span>🕐 {formatDt(t.pickupDate)}</span>
+                            <span>🚩 Until {formatDt(t.dropoffDate)}</span>
+                            <span>Booking #{t.booking_id}</span>
+                          </div>
                           <div className="sdb-payment-info">
                             <div className="payment-header"><CreditCard size={14} /><span>Payment Summary</span></div>
                             <div className="payment-detail"><span>💰 Total Amount:</span><strong>{formatCurrency(totalAmount)}</strong></div>
-                            <div className="payment-detail"><span>✅ Advance Paid:</span><strong>{formatCurrency(advancePaidAmount)}</strong></div>
-                            <div className="payment-detail highlight"><span>⏳ Remaining to Collect:</span><strong className={remainingAmount > 0 ? 'text-warning' : 'text-success'}>{formatCurrency(remainingAmount)}</strong></div>
+                            <div className="payment-detail"><span>✅ Advance Paid:</span><strong className="text-success">{formatCurrency(advancePaidAmount)}</strong></div>
+                            <div className="payment-detail highlight"><span>⏳ Remaining to Collect:</span><strong className={remainingAmount > 0 ? "text-warning" : "text-success"}>{formatCurrency(remainingAmount)}</strong></div>
                             {remainingAmount > 0 && <div className="payment-note"><span>⚠️ Customer needs to pay {formatCurrency(remainingAmount)} at pickup</span></div>}
                           </div>
-                          <div className="sdb-task-actions"><button className="btn small primary" onClick={() => prefillVerify(t.booking_id)}>Verify Key &amp; Start</button></div>
+                          <div className="sdb-task-actions">
+                            <button className="btn small primary" onClick={() => prefillVerify(t.booking_id)}>Verify Key &amp; Start</button>
+                          </div>
                         </div>
                       );
                     })}
@@ -775,16 +1060,30 @@ export default function StaffDashboard() {
                       const remainingAmount = getRemainingAmount(t);
                       return (
                         <div key={t.booking_id} className="sdb-task-card sdb-task-card--active">
-                          <div className="sdb-task-top"><div><p className="sdb-task-car">{t.car_model}</p><p className="sdb-task-plate">{t.car_plate}</p></div><span className="sdb-status-pill sdb-status-pill--active">Ongoing</span></div>
-                          <div className="sdb-task-meta"><span>👤 {t.customer_name}</span><span>▶ Running {elapsedTimes[t.booking_id] || formatElapsed(t.ride_start_time)}</span><span>🏁 Due {formatDt(t.dropoffDate)}</span><span>Booking #{t.booking_id}</span></div>
+                          <div className="sdb-task-top">
+                            <div>
+                              <p className="sdb-task-car">{t.car_model}</p>
+                              <p className="sdb-task-plate">{t.car_plate}</p>
+                              <p className="sdb-task-duration">📅 {t.duration || calculateDuration(t.pickupDate, t.dropoffDate)}</p>
+                            </div>
+                            <span className="sdb-status-pill sdb-status-pill--active">Ongoing</span>
+                          </div>
+                          <div className="sdb-task-meta">
+                            <span>👤 {t.customer_name}</span>
+                            <span>▶ Running {elapsedTimes[t.booking_id] || formatElapsed(t.ride_start_time)}</span>
+                            <span>🏁 Due {formatDt(t.dropoffDate)}</span>
+                            <span>Booking #{t.booking_id}</span>
+                          </div>
                           <div className="sdb-payment-info">
                             <div className="payment-header"><CreditCard size={14} /><span>Payment Summary</span></div>
                             <div className="payment-detail"><span>💰 Total Amount:</span><strong>{formatCurrency(totalAmount)}</strong></div>
-                            <div className="payment-detail"><span>✅ Advance Paid:</span><strong>{formatCurrency(advancePaidAmount)}</strong></div>
-                            <div className="payment-detail highlight"><span>⏳ Pending Collection:</span><strong className={remainingAmount > 0 ? 'text-warning' : 'text-success'}>{formatCurrency(remainingAmount)}</strong></div>
+                            <div className="payment-detail"><span>✅ Advance Paid:</span><strong className="text-success">{formatCurrency(advancePaidAmount)}</strong></div>
+                            <div className="payment-detail highlight"><span>⏳ Pending Collection:</span><strong className={remainingAmount > 0 ? "text-warning" : "text-success"}>{formatCurrency(remainingAmount)}</strong></div>
                             {remainingAmount > 0 && <div className="payment-note warning"><span>⚠️ Collect {formatCurrency(remainingAmount)} at ride end</span></div>}
                           </div>
-                          <div className="sdb-task-actions"><button className="btn small danger" onClick={() => prefillEndRide(t.booking_id, t)}>End Ride &amp; Collect Payment</button></div>
+                          <div className="sdb-task-actions">
+                            <button className="btn small danger" onClick={() => prefillEndRide(t.booking_id, t)}>End Ride &amp; Collect Payment</button>
+                          </div>
                         </div>
                       );
                     })}
@@ -798,7 +1097,7 @@ export default function StaffDashboard() {
         </div>
       )}
 
-      {/* Verify Tab remains same */}
+      {/* Verify Tab */}
       {activeTab === "verify" && (
         <div className="sdb-panel sdb-verify-panel">
           <div className="sdb-verify-grid">
@@ -865,7 +1164,6 @@ export default function StaffDashboard() {
                 <p className="info-text">Collect payment directly from customer and mark as received</p>
               </div>
 
-              {/* Car Details */}
               {offlinePaymentData.carDetails && (
                 <div className="car-details-section">
                   <h3>Car Details</h3>
@@ -878,7 +1176,6 @@ export default function StaffDashboard() {
                 </div>
               )}
 
-              {/* Payment Amount */}
               <div className="payment-amount-section">
                 <h3>Payment to Collect</h3>
                 <div className="amount-to-collect">
@@ -887,30 +1184,17 @@ export default function StaffDashboard() {
                 </div>
               </div>
 
-              {/* Offline Payment Form */}
               <form onSubmit={handleOfflinePayment}>
                 <div className="payment-methods">
                   <h3>Payment Method</h3>
                   <div className="method-options">
                     <label className={`method-option ${offlinePaymentForm.paymentMethod === 'cash' ? 'selected' : ''}`}>
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value="cash"
-                        checked={offlinePaymentForm.paymentMethod === 'cash'}
-                        onChange={(e) => setOfflinePaymentForm({...offlinePaymentForm, paymentMethod: e.target.value})}
-                      />
+                      <input type="radio" name="paymentMethod" value="cash" checked={offlinePaymentForm.paymentMethod === 'cash'} onChange={(e) => setOfflinePaymentForm({...offlinePaymentForm, paymentMethod: e.target.value})} />
                       <Banknote size={20} />
                       <span>Cash</span>
                     </label>
                     <label className={`method-option ${offlinePaymentForm.paymentMethod === 'upi' ? 'selected' : ''}`}>
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value="upi"
-                        checked={offlinePaymentForm.paymentMethod === 'upi'}
-                        onChange={(e) => setOfflinePaymentForm({...offlinePaymentForm, paymentMethod: e.target.value})}
-                      />
+                      <input type="radio" name="paymentMethod" value="upi" checked={offlinePaymentForm.paymentMethod === 'upi'} onChange={(e) => setOfflinePaymentForm({...offlinePaymentForm, paymentMethod: e.target.value})} />
                       <Smartphone size={20} />
                       <span>UPI (Offline)</span>
                     </label>
@@ -920,25 +1204,14 @@ export default function StaffDashboard() {
                 {offlinePaymentForm.paymentMethod === 'upi' && (
                   <div className="form-group">
                     <label>Transaction ID / UTR Number</label>
-                    <input
-                      type="text"
-                      value={offlinePaymentForm.transactionId}
-                      onChange={(e) => setOfflinePaymentForm({...offlinePaymentForm, transactionId: e.target.value})}
-                      placeholder="Enter UPI transaction ID"
-                      required
-                    />
+                    <input type="text" value={offlinePaymentForm.transactionId} onChange={(e) => setOfflinePaymentForm({...offlinePaymentForm, transactionId: e.target.value})} placeholder="Enter UPI transaction ID" required />
                     <small>Optional but recommended for tracking</small>
                   </div>
                 )}
 
                 <div className="form-group">
                   <label>Remarks (Optional)</label>
-                  <textarea
-                    rows="2"
-                    value={offlinePaymentForm.remarks}
-                    onChange={(e) => setOfflinePaymentForm({...offlinePaymentForm, remarks: e.target.value})}
-                    placeholder="Any notes about this payment..."
-                  />
+                  <textarea rows="2" value={offlinePaymentForm.remarks} onChange={(e) => setOfflinePaymentForm({...offlinePaymentForm, remarks: e.target.value})} placeholder="Any notes about this payment..." />
                 </div>
 
                 {paymentError && <div className="payment-error"><p>{paymentError}</p></div>}
@@ -965,7 +1238,7 @@ export default function StaffDashboard() {
         </div>
       )}
 
-      {/* Online Payment Modal (Legacy - for reference) */}
+      {/* Online Payment Modal (Legacy) */}
       {showPaymentModal && paymentData && (
         <div className="payment-modal-overlay">
           <div className="payment-modal">

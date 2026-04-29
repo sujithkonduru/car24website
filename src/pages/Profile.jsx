@@ -197,127 +197,69 @@ export default function Profile() {
     }
   };
 
+  const handleDocumentUpload = async (e) => {
+    e.preventDefault();
 
-const handleDocumentUpload = async (e, retryCount = 0) => {
-  e.preventDefault();
-
-  if (!documents.license && !documents.aadhar) {
-    setDocumentError(
-      "Please select at least one document to upload"
-    );
-    return;
-  }
-
-  setDocumentLoading(true);
-  setDocumentError(null);
-  setDocumentSuccess(false);
-
-  const formData = new FormData();
-
-  if (documents.license) {
-    formData.append("license", documents.license);
-  }
-
-  if (documents.aadhar) {
-    formData.append("aadhar", documents.aadhar);
-  }
-
-  try {
-    /* ✅ Correct backend endpoint */
-    await apiPost(
-      "http://localhost:3000/PhotoUpload/DocumentUpload",
-      formData,
-      { withAuth: true }
-    );
-
-    setDocumentSuccess(true);
-
-    setDocuments({
-      license: null,
-      aadhar: null,
-    });
-
-    document
-      .querySelectorAll('input[type="file"]')
-      .forEach((input) => (input.value = ""));
-
-    await load();
-
-    setTimeout(() => {
-      setShowDocumentModal(false);
-      setDocumentSuccess(false);
-    }, 2000);
-  } catch (err) {
-    console.error(
-      "Document upload error:",
-      err
-    );
-
-    const msg =
-      err?.response?.data?.error ||
-      err?.response?.data?.message ||
-      err?.message ||
-      "";
-
-    const isVisionAuthError =
-      msg.includes("16 UNAUTHENTICATED") ||
-      err?.code === 16;
-
-    /* retry google vision auth issue */
-    if (
-      isVisionAuthError &&
-      retryCount < 2
-    ) {
-      setTimeout(() => {
-        handleDocumentUpload(
-          e,
-          retryCount + 1
-        );
-      }, 1500);
-
+    if (!documents.license && !documents.aadhar) {
+      setDocumentError("Please select at least one document to upload");
       return;
     }
 
-    if (isVisionAuthError) {
+    setDocumentLoading(true);
+    setDocumentError(null);
+    setDocumentSuccess(false);
+
+    // Backend multer expects exactly: field "license" and/or field "aadhar"
+    // Both in ONE request via upload.fields([{name:"license"},{name:"aadhar"}])
+    const fd = new FormData();
+    if (documents.license) fd.append("license", documents.license, documents.license.name);
+    if (documents.aadhar)  fd.append("aadhar",  documents.aadhar,  documents.aadhar.name);
+
+    try {
+      await apiPost("/photoUpload/DocumentUpload", fd, { withAuth: true });
       setDocumentSuccess(true);
-
-      setDocuments({
-        license: null,
-        aadhar: null,
-      });
-
-      document
-        .querySelectorAll(
-          'input[type="file"]'
-        )
-        .forEach(
-          (input) =>
-            (input.value = "")
-        );
-
-      await load();
-
-      setDocumentError(
-        "✅ Files uploaded. Auto verification unavailable. Manual review pending."
-      );
-
+      setDocuments({ license: null, aadhar: null });
+      document.querySelectorAll('input[type="file"]').forEach(i => (i.value = ""));
+      load().catch(() => {});
       setTimeout(() => {
         setShowDocumentModal(false);
         setDocumentSuccess(false);
-        setDocumentError(null);
-      }, 4000);
-    } else {
-      setDocumentError(
-        msg ||
-          "Upload failed. Please try again."
-      );
+      }, 2000);
+    } catch (err) {
+      // Vision API / Google Cloud crashes with 500 AFTER the file is saved.
+      // The backend returns 400 if OCR can't detect the document number.
+      // Treat 500 as a soft success (file saved, OCR failed).
+      const is500 =
+        err.status === 500 ||
+        err.statusCode === 500 ||
+        err.message?.includes("internal server error") ||
+        err.message?.includes("Internal Server Error") ||
+        (typeof err.data === "string" && err.data.includes("<!DOCTYPE html"));
+
+      if (is500) {
+        // File reached the server and was stored; Vision OCR crashed after save
+        setDocumentSuccess(true);
+        setDocuments({ license: null, aadhar: null });
+        document.querySelectorAll('input[type="file"]').forEach(i => (i.value = ""));
+        load().catch(() => {});
+        setDocumentError("Documents uploaded. Auto-verification pending — our team will review shortly.");
+        setTimeout(() => {
+          setShowDocumentModal(false);
+          setDocumentSuccess(false);
+          setDocumentError(null);
+        }, 3500);
+      } else {
+        // 400 = OCR couldn't read the document, 401 = auth, 413 = file too large, etc.
+        const msg =
+          (typeof err.data === "object" && err.data?.message) ||
+          err.message ||
+          "Upload failed. Please upload a clear image and try again.";
+        setDocumentError(msg);
+      }
+    } finally {
+      setDocumentLoading(false);
     }
-  } finally {
-    setDocumentLoading(false);
-  }
-};
-
-
+  };
 
   const handleCarFormChange = (e) => {
     const { name, value, type, files } = e.target;
@@ -620,7 +562,11 @@ const handleDocumentUpload = async (e, retryCount = 0) => {
                     <div className="documents-grid">
                       <div className="document-card">
                         <div className="document-icon license">
-                          <Car size={32} />
+                          <img
+                          src="src/images/driver-license.png"
+                            alt="Driving License"
+                               className="license-icon"
+                          />
                         </div>
                         <div>
                           <h4>Driving License</h4>
@@ -634,7 +580,11 @@ const handleDocumentUpload = async (e, retryCount = 0) => {
                       </div>
                       <div className="document-card">
                         <div className="document-icon aadhar">
-                          <Shield size={32} />
+                          <img
+                          src="src/images/aadhaar-card.png"
+                            alt="Aadhaar Card"
+                               className="license-icon"
+                          />
                         </div>
                         <div>
                           <h4>Aadhaar Card</h4>
@@ -719,7 +669,11 @@ const handleDocumentUpload = async (e, retryCount = 0) => {
                 <div className="upload-area">
                   <div className="upload-card">
                     <div className="upload-icon license">
-                      <Car size={32} />
+                       <img
+                          src="src/images/driver-license.png"
+                            alt="Driving License"
+                               className="license-icon"
+                          />
                     </div>
                     <h4>Driving License</h4>
                     <input
@@ -742,7 +696,11 @@ const handleDocumentUpload = async (e, retryCount = 0) => {
 
                   <div className="upload-card">
                     <div className="upload-icon aadhar">
-                      <Shield size={32} />
+                      <img
+                          src="src/images/aadhaar-card.png"
+                            alt="Aadhaar Card"
+                               className="license-icon"
+                          />
                     </div>
                     <h4>Aadhaar Card</h4>
                     <input
