@@ -1,939 +1,1420 @@
-import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext.jsx";
+import { useState, useEffect, useCallback } from "react";
 import {
-  getAllData,
-  getSuperAdminFinances,
-  getFinancialData,
-  getPaymentHistory,
-  getBranches,
-  getManagementUsers,
-  getPendingOwners,
-  approveOwner,
-  getPendingCars,
-  approveCar,
-  rejectCar,
-  createStaff,
-  verifyStaffRegister,
-  adminChangePassword,
-  updateBranch,
-  markOwnerPaid,
-  getOwnerPendingBreakdown,
-  getBranchRevenue,
+  apiGet,
+  apiPut,
+  apiPost
 } from "../api.js";
-import "./AdminDashboard.css";
 
-function fmt(n) {
-  return "₹" + Number(n || 0).toLocaleString("en-IN");
+// ── Colour tokens ──────────────────────────────────────────────────────────
+const C = {
+  bg:      "#0B0F1A",
+  surface: "#111827",
+  card:    "#161D2E",
+  border:  "#1E2A3A",
+  accent:  "#3B82F6",
+  green:   "#10B981",
+  amber:   "#F59E0B",
+  red:     "#EF4444",
+  purple:  "#8B5CF6",
+  cyan:    "#06B6D4",
+  text:    "#F1F5F9",
+  muted:   "#64748B",
+  subtle:  "#1E293B",
+};
+
+// ── Tiny helpers ───────────────────────────────────────────────────────────
+const fmt = n => "₹" + Number(n || 0).toLocaleString("en-IN");
+const fmtNum = n => Number(n || 0).toLocaleString("en-IN");
+const fmtDate = d => d ? new Date(d).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "—";
+
+// ── Styles ─────────────────────────────────────────────────────────────────
+const s = {
+  root: { fontFamily:"'DM Mono', 'Fira Code', monospace", background:C.bg, minHeight:"100vh", color:C.text, display:"flex" },
+  sidebar: { width:220, background:C.surface, borderRight:`1px solid ${C.border}`, display:"flex", flexDirection:"column", padding:"24px 0", gap:4, flexShrink:0 },
+  logo: { padding:"0 20px 24px", borderBottom:`1px solid ${C.border}`, marginBottom:8 },
+  logoText: { fontSize:20, fontWeight:700, color:C.text, letterSpacing:"-0.5px" },
+  logoSub: { fontSize:10, color:C.muted, letterSpacing:3, textTransform:"uppercase", marginTop:2 },
+  navItem: (active) => ({ display:"flex", alignItems:"center", gap:10, padding:"10px 20px", cursor:"pointer", borderRadius:0, fontSize:12, letterSpacing:1, textTransform:"uppercase", fontWeight:active?700:400, color:active?C.text:C.muted, background:active?C.card:"transparent", borderLeft:`3px solid ${active?C.accent:"transparent"}`, transition:"all .15s" }),
+  main: { flex:1, overflow:"auto", padding:28, display:"flex", flexDirection:"column", gap:24 },
+  header: { display:"flex", justifyContent:"space-between", alignItems:"center" },
+  headerTitle: { fontSize:22, fontWeight:700, letterSpacing:"-0.5px" },
+  headerSub: { fontSize:11, color:C.muted, marginTop:2, letterSpacing:1, textTransform:"uppercase" },
+  grid: (cols) => ({ display:"grid", gridTemplateColumns:`repeat(${cols},1fr)`, gap:16 }),
+  card: { background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:20 },
+  cardLabel: { fontSize:10, color:C.muted, letterSpacing:2, textTransform:"uppercase", marginBottom:8 },
+  cardValue: (color) => ({ fontSize:28, fontWeight:700, color:color||C.text, letterSpacing:"-1px" }),
+  cardSub: { fontSize:11, color:C.muted, marginTop:4 },
+  badge: (color) => ({ display:"inline-flex", alignItems:"center", padding:"2px 8px", borderRadius:4, fontSize:10, fontWeight:600, letterSpacing:1, textTransform:"uppercase", background:color+"22", color }),
+  table: { width:"100%", borderCollapse:"collapse", fontSize:12 },
+  th: { padding:"10px 12px", textAlign:"left", color:C.muted, fontSize:10, letterSpacing:2, textTransform:"uppercase", borderBottom:`1px solid ${C.border}`, fontWeight:400 },
+  td: { padding:"12px 12px", borderBottom:`1px solid ${C.border}+"44"`, verticalAlign:"middle" },
+  btn: (color="#3B82F6", ghost=false) => ({ cursor:"pointer", border: ghost ? `1px solid ${color}` : "none", background: ghost ? "transparent" : color, color: ghost ? color : "#fff", padding:"7px 14px", borderRadius:6, fontSize:11, fontWeight:600, letterSpacing:1, textTransform:"uppercase", transition:"opacity .15s" }),
+  input: { background:C.subtle, border:`1px solid ${C.border}`, borderRadius:6, padding:"8px 12px", color:C.text, fontSize:12, width:"100%", outline:"none", boxSizing:"border-box" },
+  select: { background:C.subtle, border:`1px solid ${C.border}`, borderRadius:6, padding:"8px 12px", color:C.text, fontSize:12, outline:"none", cursor:"pointer" },
+  pill: { display:"flex", alignItems:"center", gap:8, padding:"6px 12px", background:C.subtle, borderRadius:20, fontSize:11, color:C.muted },
+  tag: (c) => ({ background:c+"18", color:c, padding:"2px 8px", borderRadius:3, fontSize:10, fontWeight:700, letterSpacing:1, textTransform:"uppercase" }),
+  modal: { position:"fixed", inset:0, background:"#000a", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 },
+  modalBox: { background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:28, width:480, maxWidth:"95vw", maxHeight:"85vh", overflowY:"auto" },
+  sectionTitle: { fontSize:13, fontWeight:600, color:C.muted, letterSpacing:2, textTransform:"uppercase", marginBottom:12, paddingBottom:8, borderBottom:`1px solid ${C.border}` },
+};
+
+// ── Stat Card ──────────────────────────────────────────────────────────────
+function StatCard({ label, value, sub, color, icon }) {
+  return (
+    <div style={s.card}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+        <div>
+          <div style={s.cardLabel}>{label}</div>
+          <div style={s.cardValue(color)}>{value}</div>
+          {sub && <div style={s.cardSub}>{sub}</div>}
+        </div>
+        <div style={{ fontSize:22, opacity:.6 }}>{icon}</div>
+      </div>
+    </div>
+  );
 }
 
-function fmtDate(d) {
-  if (!d) return "N/A";
-  return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+// ── Toast ──────────────────────────────────────────────────────────────────
+function Toast({ msg, type, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, [onClose]);
+  const bg = type === "error" ? C.red : C.green;
+  return (
+    <div style={{ position:"fixed", bottom:24, right:24, background:bg, color:"#fff", padding:"12px 20px", borderRadius:8, fontSize:12, fontWeight:600, zIndex:2000, letterSpacing:.5, maxWidth:340 }}>
+      {msg}
+    </div>
+  );
 }
 
-export default function SuperAdminDashboard() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const [activeTab, setActiveTab] = useState("overview");
-  const [loading, setLoading] = useState(false);
-
-  // Data states
-  const [overview, setOverview] = useState(null);
+// ─────────────────────────────────────────────────────────────────────────
+// SECTION: OVERVIEW
+// ─────────────────────────────────────────────────────────────────────────
+function OverviewSection() {
+  const [stats, setStats] = useState(null);
   const [finances, setFinances] = useState(null);
-  const [financialData, setFinancialData] = useState([]);
-  const [paymentHistory, setPaymentHistory] = useState([]);
   const [branches, setBranches] = useState([]);
-  const [management, setManagement] = useState([]);
-  const [pendingOwners, setPendingOwners] = useState([]);
-  const [pendingCars, setPendingCars] = useState([]);
-  const [branchRevenue, setBranchRevenue] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  // Form states
-  const [staffForm, setStaffForm] = useState({ 
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      apiGet("/roleauth/getAllData", { withAuth: true }),
+      apiGet("/roleauth/getSuperAdminFinances", { withAuth: true }),
+      apiGet("/roleauth/get_branches_revenue", { withAuth: true }),
+      apiGet("/cars/get_pending_cars", { withAuth: true }),
+    ]).then(([s, f, b, pc]) => {
+      setStats(s);
+      setFinances(f?.data);
+      setBranches(Array.isArray(b) ? b : []);
+      const pendingOnly = (Array.isArray(pc?.data) ? pc.data : []).filter(c => c.approvalstatus !== "rejected");
+      setPendingCount(pendingOnly.length);
+    }).catch((e) => {
+      console.error("Overview API error:", e);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ color:C.muted, padding:40, textAlign:"center" }}>Loading overview…</div>;
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+      <div style={s.grid(3)}>
+        <StatCard label="Total Gross Revenue" value={fmt(finances?.total_gross_revenue)} sub="all time" color={C.green} icon="₹" />
+        <StatCard label="Net Profit" value={fmt(finances?.total_profit)} sub="superadmin + branch" color={C.cyan} icon="📈" />
+        <StatCard label="Pending Owner Dues" value={fmt(finances?.total_pending_dues)} sub="unpaid payouts" color={C.amber} icon="⏳" />
+      </div>
+      <div style={s.grid(3)}>
+        <StatCard label="Total Cars" value={fmtNum(stats?.totalCars)} sub={`${pendingCount} pending approval`} color={C.accent} icon="🚗" />
+        <StatCard label="Branches" value={fmtNum(stats?.totalBranches)} color={C.purple} icon="🏢" />
+        <StatCard label="Cars On Road Today" value={fmtNum(stats?.carsUsedToday)} color={C.green} icon="🛣️" />
+      </div>
+      <div style={s.grid(2)}>
+        <StatCard label="Verified Users" value={fmtNum(stats?.verifiedUsers)} color={C.text} icon="✅" />
+        <StatCard label="Total Owners" value={fmtNum(stats?.totalOwners)} color={C.text} icon="👤" />
+      </div>
+
+      <div style={s.card}>
+        <div style={s.sectionTitle}>Branch Revenue Leaderboard</div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={s.table}>
+            <thead>
+              <tr>
+                {["#","Branch","City","Total Volume","Branch Keep","Owner Payout"].map(h=>(
+                  <th key={h} style={s.th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {branches.slice(0,8).map((b,i)=>(
+                <tr key={b.id}>
+                  <td style={s.td}><span style={s.tag(i===0?C.amber:i===1?C.muted:C.border)}>{i+1}</span></td>
+                  <td style={{...s.td, fontWeight:600}}>{b.name}</td>
+                  <td style={{...s.td, color:C.muted}}>{b.city}</td>
+                  <td style={s.td}>{fmt(b.total_volume)}</td>
+                  <td style={{...s.td, color:C.green}}>{fmt(b.branch_retained)}</td>
+                  <td style={{...s.td, color:C.amber}}>{fmt(b.owner_payout)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SECTION: USERS
+// ─────────────────────────────────────────────────────────────────────────
+function UsersSection() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [role, setRole] = useState("user");
+  const [page, setPage] = useState(0);
+  const limit = 15;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiGet(`/roleauth/getUsersData/null/${role}/${limit}/${page * limit}`, { withAuth: true });
+      setUsers(Array.isArray(res?.data) ? res.data : []);
+    } catch(e) { 
+      console.error("Users load error:", e);
+      setUsers([]); 
+    }
+    setLoading(false);
+  }, [role, page, limit]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <div style={{ display:"flex", gap:12, alignItems:"center", flexWrap:"wrap" }}>
+        {["user","owner"].map(r=>(
+          <button key={r} style={s.btn(r===role?C.accent:C.muted, r!==role)} onClick={()=>{setRole(r);setPage(0);}}>
+            {r === "user" ? "Customers" : "Owners"}
+          </button>
+        ))}
+        <span style={{...s.pill, marginLeft:"auto"}}>{users.length} records</span>
+      </div>
+
+      <div style={s.card}>
+        {loading ? <div style={{color:C.muted,padding:20,textAlign:"center"}}>Loading…</div> : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={s.table}>
+              <thead>
+                <tr>
+                  {["Name","Username","Email","Mobile","Verified","Profile","Role"].map(h=>(
+                    <th key={h} style={s.th}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u,i)=>(
+                  <tr key={i}>
+                    <td style={{...s.td,fontWeight:600}}>{u.name}</td>
+                    <td style={{...s.td,color:C.muted}}>{u.username||"—"}</td>
+                    <td style={s.td}>{u.email}</td>
+                    <td style={s.td}>{u.mobileNo || u.mobileno || "—"}</td>
+                    <td style={s.td}><span style={s.badge(u.is_verified?C.green:C.amber)}>{u.is_verified?"Yes":"No"}</span></td>
+                    <td style={s.td}><span style={s.badge(u.is_profile_completed?C.green:C.muted)}>{u.is_profile_completed?"Done":"Incomplete"}</span></td>
+                    <td style={s.td}><span style={s.tag(u.role==="owner"?C.purple:C.accent)}>{u.role}</span></td>
+                  </tr>
+                ))}
+                {users.length === 0 && <tr><td colSpan={7} style={{...s.td,color:C.muted,textAlign:"center"}}>No records found</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
+        <button style={s.btn(C.accent, true)} onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0}>← Prev</button>
+        <span style={s.pill}>Page {page+1}</span>
+        <button style={s.btn(C.accent, true)} onClick={()=>setPage(p=>p+1)} disabled={users.length < limit}>Next →</button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SECTION: MANAGEMENT (Staff / Admins)
+// ─────────────────────────────────────────────────────────────────────────
+function ManagementSection({ toast }) {
+  const [mgmt, setMgmt] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [role, setRole] = useState("null");
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ 
     name: "", 
     email: "", 
     password: "", 
-    role: "staff", 
-    branchId: "", 
-    mobile_no: "" 
-  });
-  const [otpModal, setOtpModal] = useState({ open: false, email: "", otp: "" });
-  const [passForm, setPassForm] = useState({ email: "", pass: "" });
-  const [branchForm, setBranchForm] = useState({ 
-    id: null, 
-    name: "", 
+    role: "sub_admin", 
+    mobile_no: "",
+    branch: "",
+    dob: null,        // Changed from "" to null
+    marrieddate: null, // Changed from "" to null
     address: "", 
-    city: "", 
-    state: "", 
-    zipCode: "", 
-    phone: "", 
-    email: "" 
+    permissions: [] 
   });
-  const [approvalForm, setApprovalForm] = useState({ 
-    carId: null, 
-    six: "", 
-    twelve: "", 
-    twentyFour: "" 
-  });
-  
-  // Filter states
-  const [financialFilters, setFinancialFilters] = useState({ 
-    fromDate: "", 
-    carid: "", 
-    ownerid: "", 
-    branchid: "", 
-    status: "" 
-  });
-  const [payHistFilters, setPayHistFilters] = useState({ 
-    branchid: "", 
-    date: "" 
-  });
+  const [pwModal, setPwModal] = useState(null);
+  const [newPw, setNewPw] = useState("");
+  const [verifyModal, setVerifyModal] = useState(null);
+  const [otpVal, setOtpVal] = useState("");
+  const [page, setPage] = useState(0);
+  const limit = 15;
 
-  const [notification, setNotification] = useState(null);
+  const fetchBranches = useCallback(async () => {
+    setLoadingBranches(true);
+    try {
+      const res = await apiGet("/roleauth/get_branches_revenue", { withAuth: true });
+      const branchesData = Array.isArray(res) ? res : (res?.data || []);
+      setBranches(branchesData);
+    } catch (error) {
+      console.error("Error fetching branches:", error);
+      setBranches([]);
+    } finally {
+      setLoadingBranches(false);
+    }
+  }, []);
 
-  function showNotification(text, type = "success") {
-    setNotification({ text, type });
-    setTimeout(() => setNotification(null), 3500);
-  }
+  useEffect(() => {
+    if (showCreate) {
+      fetchBranches();
+    }
+  }, [showCreate, fetchBranches]);
 
-  const loadData = useCallback(async (tab) => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      if (tab === "overview" || tab === "all") {
-        const [ov, br, rev] = await Promise.allSettled([
-          getAllData(), 
-          getBranches(), 
-          getBranchRevenue()
-        ]);
-        if (ov.status === "fulfilled") setOverview(ov.value);
-        if (br.status === "fulfilled") setBranches(Array.isArray(br.value) ? br.value : br.value?.data || []);
-        if (rev.status === "fulfilled") setBranchRevenue(Array.isArray(rev.value) ? rev.value : []);
-      }
-      if (tab === "management" || tab === "all") {
-        const res = await getManagementUsers("null", "null", "null", "1000", "0");
-        setManagement(res?.data || []);
-      }
-      if (tab === "approvals" || tab === "all") {
-        const [po, pc] = await Promise.allSettled([getPendingOwners(), getPendingCars()]);
-        if (po.status === "fulfilled") setPendingOwners(po.value?.data || po.value || []);
-        if (pc.status === "fulfilled") setPendingCars(pc.value?.data || pc.value || []);
-      }
-      if (tab === "financials" || tab === "all") {
-        const [fin, sf] = await Promise.allSettled([
-          getFinancialData(financialFilters),
-          getSuperAdminFinances(),
-        ]);
-        if (fin.status === "fulfilled") setFinancialData(fin.value?.data || fin.value || []);
-        if (sf.status === "fulfilled") setFinances(sf.value);
-      }
-      if (tab === "payments") {
-        const res = await getPaymentHistory(payHistFilters);
-        setPaymentHistory(res?.data || res || []);
-      }
-    } catch (e) {
-      showNotification(e.message || "Load failed", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [financialFilters, payHistFilters]);
+      const res = await apiGet(`/roleauth/getManagementData/null/null/${role}/${limit}/${page * limit}`, { withAuth: true });
+      setMgmt(Array.isArray(res?.data) ? res.data : []);
+    } catch { setMgmt([]); }
+    setLoading(false);
+  }, [role, page, limit]);
 
-  useEffect(() => { 
-    loadData(activeTab); 
-  }, [activeTab, loadData]);
+  useEffect(() => { load(); }, [load]);
 
-  // Handler functions
-  async function handleApproveOwner(id) {
-    try { 
-      await approveOwner(id); 
-      showNotification("Owner approved successfully"); 
-      loadData("approvals");
-    } catch (e) { 
-      showNotification(e.message, "error"); 
-    }
-  }
-
-  async function handleApproveCar(e) {
-    e.preventDefault();
-    if (!approvalForm.six || !approvalForm.twelve || !approvalForm.twentyFour) {
-      showNotification("Please set all prices", "error"); 
+  const handleCreate = async () => {
+    // Validate required fields
+    if (!form.name?.trim()) { toast("Name is required", "error"); return; }
+    if (!form.email?.trim()) { toast("Email is required", "error"); return; }
+    if (!form.password?.trim()) { toast("Password is required", "error"); return; }
+    if (!form.mobile_no?.trim()) { toast("Mobile number is required", "error"); return; }
+    if ((form.role === "staff" || form.role === "sub_admin") && !form.branch) {
+      toast(`${form.role.replace('_', ' ')} role requires a branch assignment`, "error");
       return;
     }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) { toast("Please enter a valid email address", "error"); return; }
+
+    const mobileRegex = /^\d{10}$/;
+    if (!mobileRegex.test(form.mobile_no)) { toast("Please enter a valid 10-digit mobile number", "error"); return; }
+
+    if (form.password.length < 6) { toast("Password must be at least 6 characters long", "error"); return; }
+
+    // Prepare data for API - convert empty strings to null for date fields
+    const payload = {
+      ...form,
+      dob: form.dob === "" ? null : form.dob,
+      marrieddate: form.marrieddate === "" ? null : form.marrieddate,
+    };
+
     try {
-      await approveCar(approvalForm.carId, { 
-        status: "approved", 
-        six: +approvalForm.six, 
-        twelve: +approvalForm.twelve, 
-        twentyFour: +approvalForm.twentyFour 
-      });
-      showNotification("Car approved successfully"); 
-      setApprovalForm({ carId: null, six: "", twelve: "", twentyFour: "" }); 
-      loadData("approvals");
-    } catch (e) { 
-      showNotification(e.message, "error"); 
+      console.log("Sending payload:", payload);
+      const response = await apiPost("/roleauth/createMangement", payload, { withAuth: true });
+      if (response.message === "User created successfully") {
+        toast("Account created! OTP sent to email for verification", "success");
+        setShowCreate(false);
+        setForm({ 
+          name: "", email: "", password: "", role: "sub_admin", 
+          mobile_no: "", branch: "", dob: "", marrieddate:"", address: "", permissions: [] 
+        });
+        load();
+      } else {
+        toast(response.message || "Creation failed", "error");
+      }
+    } catch(e) { 
+      console.error("Creation error:", e);
+      const errorMessage = e.response?.data?.message || e.message || "Network error";
+      toast(errorMessage, "error");
     }
-  }
+  };
 
-  async function handleRejectCar(id) {
-    if (!window.confirm("Are you sure you want to reject this car?")) return;
-    try { 
-      await rejectCar(id); 
-      showNotification("Car is rejected"); 
-      loadData("approvals");
-    } catch (e) { 
-      showNotification(e.message, "error"); 
-    }
-  }
-
-  async function handleCreateStaff(e) {
-    e.preventDefault();
+  const handleVerifyOtp = async () => {
+    if (!otpVal || otpVal.length !== 6) { toast("Please enter a valid 6-digit OTP", "error"); return; }
     try {
-      await createStaff(staffForm);
-      setOtpModal({ open: true, email: staffForm.email, otp: "" });
-      setStaffForm({ name: "", email: "", password: "", role: "staff", branchId: "", mobile_no: "" });
-      showNotification("Staff created — please verify OTP");
-    } catch (e) { 
-      showNotification(e.message, "error"); 
+      await apiPut("/roleauth/verifyManagementRegister", { email: verifyModal.email, otp: otpVal }, { withAuth: true });
+      toast("Account verified successfully!", "success");
+      setVerifyModal(null); setOtpVal("");
+      load();
+    } catch(e) { 
+      toast(e.response?.data?.message || e.message, "error"); 
     }
-  }
+  };
 
-  async function handleVerifyOtp(e) {
-    e.preventDefault();
+  const handleChangePw = async () => {
+    if (!newPw || newPw.length < 6) { toast("Password must be at least 6 characters long", "error"); return; }
     try {
-      await verifyStaffRegister(otpModal.email, otpModal.otp);
-      showNotification("Staff verified successfully"); 
-      setOtpModal({ open: false, email: "", otp: "" }); 
-      loadData("management");
-    } catch (e) { 
-      showNotification(e.message, "error"); 
+      await apiPut(`/roleauth/superAdmin/changePass/${pwModal.email}`, { pass: newPw }, { withAuth: true });
+      toast("Password changed successfully!", "success");
+      setPwModal(null); setNewPw("");
+    } catch(e) { 
+      toast(e.response?.data?.message || e.message, "error"); 
     }
-  }
+  };
 
-  async function handleChangePassword(e) {
-    e.preventDefault();
-    try { 
-      await adminChangePassword(passForm.email, passForm.pass); 
-      showNotification("Password changed successfully"); 
-      setPassForm({ email: "", pass: "" }); 
-    } catch (e) { 
-      showNotification(e.message, "error"); 
-    }
-  }
+  const handleDateChange = (field, value) => {
+    // If value is empty string, set to null, otherwise keep the date
+    setForm(f => ({ ...f, [field]: value === "" ? null : value }));
+  };
 
-  async function handleUpdateBranch(e) {
-    e.preventDefault();
-    try {
-      await updateBranch(branchForm.id, branchForm);
-      showNotification("Branch updated successfully"); 
-      setBranchForm({ id: null, name: "", address: "", city: "", state: "", zipCode: "", phone: "", email: "" }); 
-      loadData("overview");
-    } catch (e) { 
-      showNotification(e.message, "error"); 
-    }
-  }
-
-  async function handleMarkPaid(ownerId, branchId) {
-    try { 
-      await markOwnerPaid(ownerId, branchId); 
-      showNotification("Marked as paid"); 
-      loadData("financials");
-    } catch (e) { 
-      showNotification(e.message, "error"); 
-    }
-  }
-
-  const tabs = [
-    { id: "overview", label: "Dashboard", icon: "📊" },
-    { id: "branches", label: "Branches", icon: "🏢" },
-    { id: "management", label: "Team", icon: "👥" },
-    { id: "approvals", label: "Pending Approvals", icon: "⏳" },
-    { id: "financials", label: "Revenue", icon: "💰" },
-    { id: "payments", label: "Transactions", icon: "💳" },
-    { id: "settings", label: "Settings", icon: "⚙️" },
-  ];
+  const roles = ["null", "admin", "sub_admin", "staff"];
 
   return (
-    <div className="admin-dashboard">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <div className="logo">🚗 CarRental</div>
-          <div className="role-badge">Super Admin</div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        {roles.map(r => (
+          <button 
+            key={r} 
+            style={s.btn(r === role ? C.accent : C.muted, r !== role)} 
+            onClick={() => { setRole(r); setPage(0); }}
+          >
+            {r === "null" ? "All" : r === "sub_admin" ? "Sub Admin" : r.charAt(0).toUpperCase() + r.slice(1)}
+          </button>
+        ))}
+        <button style={{ ...s.btn(C.green), marginLeft: "auto" }} onClick={() => setShowCreate(true)}>
+          + Add Member
+        </button>
+      </div>
+
+      <div style={s.card}>
+        {loading ? <div style={{ color: C.muted, padding: 20, textAlign: "center" }}>Loading…</div> : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={s.table}>
+              <thead>
+                <tr>
+                  {["Name", "Email", "Role", "Branch", "Verified", "Actions"].map(h => (
+                    <th key={h} style={s.th}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {mgmt.map((u, i) => (
+                  <tr key={i}>
+                    <td style={{ ...s.td, fontWeight: 600 }}>{u.name}</td>
+                    <td style={s.td}>{u.email}</td>
+                    <td style={s.td}>
+                      <span style={s.tag(u.role === "admin" ? C.red : u.role === "sub_admin" ? C.purple : C.cyan)}>
+                        {u.role === "sub_admin" ? "Sub Admin" : u.role}
+                      </span>
+                    </td>
+                    <td style={{ ...s.td, color: C.muted }}>{u.branch || "—"} </td>
+                    <td style={s.td}>
+                      <span style={s.badge(u.is_verified ? C.green : C.amber)}>
+                        {u.is_verified ? "Verified" : "Pending"}
+                      </span>
+                    </td>
+                    <td style={s.td}>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {!u.is_verified && (
+                          <button 
+                            style={s.btn(C.amber, true)} 
+                            onClick={() => setVerifyModal({ email: u.email })}
+                          >
+                            Verify
+                          </button>
+                        )}
+                        <button 
+                          style={s.btn(C.accent, true)} 
+                          onClick={() => setPwModal({ email: u.email })}
+                        >
+                          Reset PW
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {mgmt.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ ...s.td, color: C.muted, textAlign: "center" }}>
+                      No records found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+        <button 
+          style={s.btn(C.accent, true)} 
+          onClick={() => setPage(p => Math.max(0, p - 1))} 
+          disabled={page === 0}
+        >
+          ← Prev
+        </button>
+        <span style={s.pill}>Page {page + 1}</span>
+        <button 
+          style={s.btn(C.accent, true)} 
+          onClick={() => setPage(p => p + 1)} 
+          disabled={mgmt.length < limit}
+        >
+          Next →
+        </button>
+      </div>
+
+      {/* Create Modal */}
+      {showCreate && (
+        <div style={s.modal} onClick={() => setShowCreate(false)}>
+          <div style={s.modalBox} onClick={e => e.stopPropagation()}>
+            <div style={s.sectionTitle}>Create Management Account</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              
+              {/* Name Field */}
+              <div>
+                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  Name *
+                </div>
+                <input 
+                  style={s.input} 
+                  type="text" 
+                  value={form.name} 
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))} 
+                  placeholder="Enter full name"
+                />
+              </div>
+
+              {/* Email Field */}
+              <div>
+                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  Email *
+                </div>
+                <input 
+                  style={s.input} 
+                  type="email" 
+                  value={form.email} 
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))} 
+                  placeholder="Enter email address"
+                />
+              </div>
+
+              {/* Password Field */}
+              <div>
+                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  Password *
+                </div>
+                <input 
+                  style={s.input} 
+                  type="password" 
+                  value={form.password} 
+                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))} 
+                  placeholder="Minimum 6 characters"
+                />
+              </div>
+
+              {/* Mobile Field */}
+              <div>
+                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  Mobile Number *
+                </div>
+                <input 
+                  style={s.input} 
+                  type="tel" 
+                  value={form.mobile_no} 
+                  onChange={e => setForm(f => ({ ...f, mobile_no: e.target.value.replace(/\D/g, '').slice(0, 10) }))} 
+                  placeholder="10-digit mobile number"
+                  maxLength={10}
+                />
+              </div>
+
+              {/* DOB Field - Handle empty values */}
+              <div>
+                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  Date of Birth (Optional)
+                </div>
+                <input 
+                  style={s.input} 
+                  type="date" 
+                  value={form.dob || ""} 
+                  onChange={e => handleDateChange('dob', e.target.value)} 
+                />
+              </div>
+
+              {/* Married Date Field - Handle empty values */}
+              <div>
+                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  Married Date (Optional)
+                </div>
+                <input 
+                  style={s.input} 
+                  type="date" 
+                  value={form.marrieddate || ""} 
+                  onChange={e => handleDateChange('marrieddate', e.target.value)} 
+                />
+              </div>
+
+              {/* Address Field */}
+              <div>
+                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  Address
+                </div>
+                <textarea 
+                  style={{ ...s.input, minHeight: 60, resize: "vertical" }} 
+                  value={form.address} 
+                  onChange={e => setForm(f => ({ ...f, address: e.target.value }))} 
+                  placeholder="Enter complete address"
+                />
+              </div>
+
+              {/* Branch Dropdown */}
+              <div>
+                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  Branch {loadingBranches && <span style={{ fontSize: 9 }}>(Loading...)</span>}
+                  {(form.role === "staff" || form.role === "sub_admin") && <span style={{ color: C.red }}>*</span>}
+                </div>
+                <select 
+                  style={{ ...s.select, width: "100%" }} 
+                  value={form.branch} 
+                  onChange={e => setForm(f => ({ ...f, branch: e.target.value }))}
+                  disabled={loadingBranches}
+                >
+                  <option value="">Select Branch</option>
+                  {branches.map(branch => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name} {branch.city ? `(${branch.city})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {branches.length === 0 && !loadingBranches && (
+                  <div style={{ fontSize: 11, color: C.amber, marginTop: 4 }}>
+                    No branches found. Please create a branch first.
+                  </div>
+                )}
+              </div>
+
+              {/* Role Field */}
+              <div>
+                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  Role *
+                </div>
+                <select 
+                  style={{ ...s.select, width: "100%" }} 
+                  value={form.role} 
+                  onChange={e => setForm(f => ({ ...f, role: e.target.value, branch: e.target.value === "admin" ? "" : f.branch }))}
+                >
+                  <option value="admin">Admin</option>
+                  <option value="sub_admin">Sub Admin</option>
+                  <option value="staff">Staff</option>
+                </select>
+                {form.role === "admin" && (
+                  <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>
+                    Note: Admin role does not require branch assignment
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button style={s.btn(C.green)} onClick={handleCreate}>Create Account</button>
+              <button style={s.btn(C.muted, true)} onClick={() => setShowCreate(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Verify OTP Modal */}
+      {verifyModal && (
+        <div style={s.modal} onClick={() => setVerifyModal(null)}>
+          <div style={s.modalBox} onClick={e => e.stopPropagation()}>
+            <div style={s.sectionTitle}>Verify Account OTP</div>
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>
+              Email: <strong>{verifyModal.email}</strong>
+            </div>
+            <input 
+              style={s.input} 
+              type="text"
+              placeholder="Enter 6-digit OTP" 
+              value={otpVal} 
+              onChange={e => setOtpVal(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+              maxLength={6}
+            />
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button style={s.btn(C.green)} onClick={handleVerifyOtp}>Verify</button>
+              <button style={s.btn(C.muted, true)} onClick={() => setVerifyModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change PW Modal */}
+      {pwModal && (
+        <div style={s.modal} onClick={() => setPwModal(null)}>
+          <div style={s.modalBox} onClick={e => e.stopPropagation()}>
+            <div style={s.sectionTitle}>Reset Password</div>
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>
+              Email: <strong>{pwModal.email}</strong>
+            </div>
+            <input 
+              style={s.input} 
+              type="password" 
+              placeholder="New password (min 6 characters)" 
+              value={newPw} 
+              onChange={e => setNewPw(e.target.value)} 
+            />
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button style={s.btn(C.accent)} onClick={handleChangePw}>Update Password</button>
+              <button style={s.btn(C.muted, true)} onClick={() => setPwModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BRANCH FORM — defined outside BranchesSection to prevent focus loss
+// ─────────────────────────────────────────────────────────────────────────
+const BRANCH_FIELDS = [
+  { label: "Branch Name",  key: "name",    type: "text",  placeholder: "e.g. Hyderabad Central" },
+  { label: "Address",      key: "address", type: "text",  placeholder: "Street / Area" },
+  { label: "City",         key: "city",    type: "text",  placeholder: "e.g. Hyderabad" },
+  { label: "State",        key: "state",   type: "text",  placeholder: "e.g. Telangana" },
+  { label: "Zip Code",     key: "zipcode", type: "text",  placeholder: "e.g. 500001", maxLength: 6 },
+  { label: "Phone",        key: "phone",   type: "tel",   placeholder: "10-digit number", maxLength: 10 },
+  { label: "Email",        key: "email",   type: "email", placeholder: "branch@car24.in" },
+];
+
+function BranchForm({ form, setForm, onSubmit, onCancel, submitLabel }) {
+  const [branchHeads, setBranchHeads] = useState([]);
+
+  useEffect(() => {
+    apiGet("/roleauth/getManagementData/null/null/branch_head/100/0", { withAuth: true })
+      .then(res => setBranchHeads(Array.isArray(res?.data) ? res.data : []))
+      .catch(() => setBranchHeads([]));
+  }, []);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {BRANCH_FIELDS.map(({ label, key, type, placeholder, maxLength }) => (
+        <div key={key}>
+          <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+          <input
+            style={s.input}
+            type={type}
+            value={form[key] || ""}
+            placeholder={placeholder}
+            maxLength={maxLength}
+            onChange={e => {
+              let val = e.target.value;
+              if (key === "phone" || key === "zipcode") val = val.replace(/\D/g, "");
+              setForm(f => ({ ...f, [key]: val }));
+            }}
+          />
+        </div>
+      ))}
+      <div>
+        <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>Branch Head (Optional)</div>
+        <select
+          style={{ ...s.select, width: "100%" }}
+          value={form.branchHeadId || ""}
+          onChange={e => setForm(f => ({ ...f, branchHeadId: e.target.value || null }))}
+        >
+          <option value="">— Select Branch Head —</option>
+          {branchHeads.map(bh => (
+            <option key={bh.id} value={bh.id}>{bh.name} ({bh.email})</option>
+          ))}
+        </select>
+        {branchHeads.length === 0 && (
+          <div style={{ fontSize: 10, color: C.amber, marginTop: 4 }}>No branch heads found. Create one in Management first.</div>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+        <button style={s.btn(C.green)} onClick={onSubmit}>{submitLabel}</button>
+        <button style={s.btn(C.muted, true)} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SECTION: BRANCHES
+// ─────────────────────────────────────────────────────────────────────────
+function BranchesSection({ toast }) {
+  const [branches, setBranches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [editBranch, setEditBranch] = useState(null);
+  const [form, setForm] = useState({ name:"", address:"", city:"", state:"", zipcode:"", phone:"", email:"", branchHeadId:"" });
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await apiGet("/roleauth/get_branches_revenue", { withAuth: true });
+      setBranches(Array.isArray(res) ? res : []);
+    } catch { setBranches([]); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const handleCreate = async () => {
+    if (!form.name?.trim())    { toast("Branch name is required", "error"); return; }
+    if (!form.address?.trim()) { toast("Address is required", "error"); return; }
+    if (!form.city?.trim())    { toast("City is required", "error"); return; }
+    if (!form.state?.trim())   { toast("State is required", "error"); return; }
+    if (!form.zipcode?.trim()) { toast("Zip code is required", "error"); return; }
+    if (!form.phone?.trim())   { toast("Phone is required", "error"); return; }
+    if (!form.email?.trim())   { toast("Email is required", "error"); return; }
+    try {
+      const payload = {
+        name:         form.name.trim(),
+        address:      form.address.trim(),
+        city:         form.city.trim(),
+        state:        form.state.trim(),
+        zipCode:      form.zipcode.trim(),
+        phone:        form.phone.trim(),
+        email:        form.email.trim(),
+        branchHeadId: form.branchHeadId?.trim() || null,
+      };
+      const res = await apiPost("/branch/create-branch", payload, { withAuth: true });
+      toast("Branch created!", "success");
+      setShowCreate(false);
+      setForm({ name:"", address:"", city:"", state:"", zipcode:"", phone:"", email:"", branchHeadId:"" });
+      load();
+    } catch(e) { toast(e.message, "error"); }
+  };
+
+  const handleUpdate = async () => {
+    try {
+      await apiPut(`/roleauth/update-branch/${editBranch.id}`, form);
+      toast("Branch updated!", "success");
+      setEditBranch(null);
+      load();
+    } catch(e) { toast(e.message,"error"); }
+  };
+
+  const openEdit = (b) => {
+    setEditBranch(b);
+    setForm({ name:b.name, address:"", city:b.city, state:"", zipcode:"", phone:"", email:"", branchHeadId:"" });
+  };
+
+
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <div style={{ display:"flex", justifyContent:"flex-end" }}>
+        <button style={s.btn(C.green)} onClick={()=>setShowCreate(true)}>+ New Branch</button>
+      </div>
+
+      <div style={s.card}>
+        {loading ? <div style={{color:C.muted,padding:20,textAlign:"center"}}>Loading…</div> : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={s.table}>
+              <thead><tr>{["Branch","City","Total Volume","Retained","Owner Payout","Actions"].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead>
+              <tbody>
+                {branches.map((b,i)=>(
+                  <tr key={i}>
+                    <td style={{...s.td,fontWeight:600}}>{b.name}</td>
+                    <td style={{...s.td,color:C.muted}}>{b.city}</td>
+                    <td style={s.td}>{fmt(b.total_volume)}</td>
+                    <td style={{...s.td,color:C.green}}>{fmt(b.branch_retained)}</td>
+                    <td style={{...s.td,color:C.amber}}>{fmt(b.owner_payout)}</td>
+                    <td style={s.td}><button style={s.btn(C.accent,true)} onClick={()=>openEdit(b)}>Edit</button></td>
+                  </tr>
+                ))}
+                {branches.length===0 && <tr><td colSpan={6} style={{...s.td,color:C.muted,textAlign:"center"}}>No branches</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {showCreate && (
+        <div style={s.modal} onClick={()=>setShowCreate(false)}>
+          <div style={s.modalBox} onClick={e=>e.stopPropagation()}>
+            <div style={s.sectionTitle}>Create New Branch</div>
+            <BranchForm
+              form={form}
+              setForm={setForm}
+              onSubmit={handleCreate}
+              onCancel={() => { setShowCreate(false); setEditBranch(null); }}
+              submitLabel="Create Branch"
+            />
+          </div>
+        </div>
+      )}
+
+      {editBranch && (
+        <div style={s.modal} onClick={()=>setEditBranch(null)}>
+          <div style={s.modalBox} onClick={e=>e.stopPropagation()}>
+            <div style={s.sectionTitle}>Edit Branch — {editBranch.name}</div>
+            <BranchForm
+              form={form}
+              setForm={setForm}
+              onSubmit={handleUpdate}
+              onCancel={() => { setShowCreate(false); setEditBranch(null); }}
+              submitLabel="Save Changes"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SECTION: CARS
+// ─────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// SECTION: CARS (Fixed for Super Admin Approval)
+// ─────────────────────────────────────────────────────────────────────────
+function CarsSection({ toast }) {
+  const [cars, setCars] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("pending");
+  const [pricingModal, setPricingModal] = useState(null);
+  const [pricing, setPricing] = useState({ 
+    six_hr_price: "", 
+    twelve_hr_price: "", 
+    twentyfour_hr_price: "", 
+    percentage: 70 
+  });
+  const [page, setPage] = useState(0);
+  const [viewModal, setViewModal] = useState(null);
+  const limit = 12;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (filter === "pending") {
+        const res = await apiGet("/cars/get_pending_cars", { withAuth: true });
+        const all = Array.isArray(res?.data) ? res.data : [];
+        setCars(all.filter(c => c.approvalstatus !== "rejected"));
+      } else {
+        // Fetch all approved cars
+        const res = await apiGet("/cars/get_cars", { withAuth: true, query: { limit, pageno: page } });
+        console.log("All cars response:", res);
+        setCars(Array.isArray(res?.data) ? res.data : []);
+      }
+    } catch (error) {
+      console.error("Error loading cars:", error);
+      setCars([]);
+      toast(error.message || "Failed to load cars", "error");
+    }
+    setLoading(false);
+  }, [filter, page, limit, toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleApprove = async () => {
+    // Validate pricing inputs
+    if (!pricing.six_hr_price || !pricing.twelve_hr_price || !pricing.twentyfour_hr_price) {
+      toast("Please enter all pricing fields", "error");
+      return;
+    }
+
+    try {
+      const response = await apiPut(`/cars/approve_pending_cars/${pricingModal.id}`, {
+        status: "approved",
+        six: parseFloat(pricing.six_hr_price),
+        twelve: parseFloat(pricing.twelve_hr_price),
+        twentyFour: parseFloat(pricing.twentyfour_hr_price),
+        percentage: parseFloat(pricing.percentage)
+      }, { withAuth: true });
+      
+      console.log("Approve response:", response);
+      toast("Car approved successfully!", "success");
+      setPricingModal(null);
+      setPricing({ six_hr_price: "", twelve_hr_price: "", twentyfour_hr_price: "", percentage: 70 });
+      load(); // Refresh the list
+    } catch (error) {
+      console.error("Approve error:", error);
+      toast(error.message || "Failed to approve car", "error");
+    }
+  };
+
+  const handleReject = async (carId) => {
+    if (!confirm("Are you sure you want to reject this car?")) return;
+    
+    try {
+      await apiPut(`/cars/approve_pending_cars/${carId}`, { 
+        status: "rejected" 
+      }, { withAuth: true });
+      toast("Car rejected", "success");
+      load();
+    } catch (error) {
+      console.error("Reject error:", error);
+      toast(error.message || "Failed to reject car", "error");
+    }
+  };
+
+  const handleUpdateCar = async (carId, data) => {
+    try {
+      await apiPut(`/roleauth/updateCar/${carId}`, data, { withAuth: true });
+      toast("Car updated successfully!", "success");
+      load();
+    } catch (error) {
+      console.error("Update error:", error);
+      toast(error.message || "Failed to update car", "error");
+    }
+  };
+
+  const ViewCarModal = ({ car, onClose }) => (
+    <div style={s.modal} onClick={onClose}>
+      <div style={{...s.modalBox, maxWidth: 600}} onClick={e => e.stopPropagation()}>
+        <div style={s.sectionTitle}>Car Details - {car.model}</div>
+        
+        {/* Car Images */}
+        {car.images && car.images.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: C.muted, marginBottom: 8 }}>IMAGES</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8 }}>
+              {car.images.slice(0, 3).map((img, idx) => (
+                <img 
+                  key={idx} 
+                  src={img} 
+                  alt={`${car.model} ${idx + 1}`}
+                  style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 6 }}
+                  onError={(e) => { e.target.src = "https://via.placeholder.com/100?text=No+Image"; }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div><div style={{ fontSize: 10, color: C.muted }}>Model</div><div style={{ fontWeight: 600 }}>{car.model}</div></div>
+          <div><div style={{ fontSize: 10, color: C.muted }}>Year</div><div>{car.year}</div></div>
+          <div><div style={{ fontSize: 10, color: C.muted }}>Category</div><div>{car.category}</div></div>
+          <div><div style={{ fontSize: 10, color: C.muted }}>Transmission</div><div>{car.transmission}</div></div>
+          <div><div style={{ fontSize: 10, color: C.muted }}>Fuel Type</div><div>{car.fuelType}</div></div>
+          <div><div style={{ fontSize: 10, color: C.muted }}>Seating Capacity</div><div>{car.seatingCapacity}</div></div>
+          <div><div style={{ fontSize: 10, color: C.muted }}>Color</div><div>{car.colour}</div></div>
+          <div><div style={{ fontSize: 10, color: C.muted }}>License Plate</div><div>{car.licensePlate}</div></div>
+          <div><div style={{ fontSize: 10, color: C.muted }}>Mileage</div><div>{car.mileage} km</div></div>
+          <div><div style={{ fontSize: 10, color: C.muted }}>Status</div><span style={s.tag(car.isAvailable ? C.green : C.red)}>{car.isAvailable ? "Available" : "Unavailable"}</span></div>
+          <div><div style={{ fontSize: 10, color: C.muted }}>Approval Status</div><span style={s.badge(car.approvalstatus === "approved" ? C.green : C.amber)}>{car.approvalstatus}</span></div>
         </div>
         
-        <nav className="sidebar-nav">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`nav-item ${activeTab === tab.id ? "active" : ""}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <span className="nav-icon">{tab.icon}</span>
-              <span className="nav-label">{tab.label}</span>
-            </button>
-          ))}
-        </nav>
+        <button style={{...s.btn(C.accent), marginTop: 16, width: "100%" }} onClick={onClose}>Close</button>
+      </div>
+    </div>
+  );
 
-        <div className="sidebar-footer">
-          <button className="nav-item logout" onClick={() => { logout(); navigate("/staff/login"); }}>
-            <span className="nav-icon">🚪</span>
-            <span className="nav-label">Logout</span>
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        {["pending", "all"].map(f => (
+          <button 
+            key={f} 
+            style={s.btn(f === filter ? C.accent : C.muted, f !== filter)} 
+            onClick={() => { setFilter(f); setPage(0); }}
+          >
+            {f === "pending" ? "🚗 Pending Approval" : "📋 All Cars"}
           </button>
+        ))}
+        <span style={{...s.pill, marginLeft: "auto"}}>
+          {cars.length} {filter === "pending" ? "pending" : "total"} cars
+        </span>
+      </div>
+
+      <div style={s.card}>
+        {loading ? (
+          <div style={{ color: C.muted, padding: 20, textAlign: "center" }}>Loading cars...</div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={s.table}>
+              <thead>
+                <tr>
+                  {["Image", "Model", "Year", "Category", "Fuel", "Seats", "Branch", "Status", "Approval", "Actions"].map(h => (
+                    <th key={h} style={s.th}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {cars.map((c, i) => (
+                  <tr key={i}>
+                    <td style={s.td}>
+                      {c.images && c.images[0] ? (
+                        <img 
+                          src={c.images[0]} 
+                          alt={c.model}
+                          style={{ width: 50, height: 40, objectFit: "cover", borderRadius: 4 }}
+                          onError={(e) => { e.target.src = "https://via.placeholder.com/50x40?text=Car"; }}
+                        />
+                      ) : (
+                        <div style={{ width: 50, height: 40, background: C.subtle, borderRadius: 4 }}></div>
+                      )}
+                    </td>
+                    <td style={{...s.td, fontWeight: 600}}>{c.model}</td>
+                    <td style={s.td}>{c.year}</td>
+                    <td style={s.td}>{c.category}</td>
+                    <td style={s.td}>{c.fuelType}</td>
+                    <td style={s.td}>{c.seatingCapacity}</td>
+                    <td style={{...s.td, color: C.muted}}>{c.branch_name || "—"}</td>
+                    <td style={s.td}>
+                      <span style={s.tag(c.isAvailable ? C.green : C.red)}>
+                        {c.isAvailable ? "Available" : "Unavailable"}
+                      </span>
+                    </td>
+                    <td style={s.td}>
+                      <span style={s.badge(
+                        c.approvalstatus === "approved" ? C.green : 
+                        c.approvalstatus === "rejected" ? C.red : C.amber
+                      )}>
+                        {c.approvalstatus}
+                      </span>
+                    </td>
+                    <td style={s.td}>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <button 
+                          style={s.btn(C.cyan, true)} 
+                          onClick={() => setViewModal(c)}
+                        >
+                          View
+                        </button>
+                        
+                        {c.approvalstatus === "pending" && (
+                          <>
+                            <button 
+                              style={s.btn(C.green)} 
+                              onClick={() => { 
+                                setPricingModal(c); 
+                                setPricing({ 
+                                  six_hr_price: "", 
+                                  twelve_hr_price: "", 
+                                  twentyfour_hr_price: "", 
+                                  percentage: 70 
+                                }); 
+                              }}
+                            >
+                              Approve
+                            </button>
+                            <button 
+                              style={s.btn(C.red, true)} 
+                              onClick={() => handleReject(c.id)}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        
+                        {c.approvalstatus === "approved" && (
+                          <button 
+                            style={s.btn(C.amber, true)} 
+                            onClick={() => handleUpdateCar(c.id, { isAvailable: !c.isAvailable })}
+                          >
+                            {c.isAvailable ? "Disable" : "Enable"}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {cars.length === 0 && (
+                  <tr>
+                    <td colSpan={10} style={{...s.td, color: C.muted, textAlign: "center"}}>
+                      {filter === "pending" ? "No pending cars for approval" : "No cars found"}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {filter !== "pending" && (
+        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+          <button 
+            style={s.btn(C.accent, true)} 
+            onClick={() => setPage(p => Math.max(0, p - 1))} 
+            disabled={page === 0}
+          >
+            ← Prev
+          </button>
+          <span style={s.pill}>Page {page + 1}</span>
+          <button 
+            style={s.btn(C.accent, true)} 
+            onClick={() => setPage(p => p + 1)} 
+            disabled={cars.length < limit}
+          >
+            Next →
+          </button>
+        </div>
+      )}
+
+      {/* Pricing Modal for Approval */}
+      {pricingModal && (
+        <div style={s.modal} onClick={() => setPricingModal(null)}>
+          <div style={s.modalBox} onClick={e => e.stopPropagation()}>
+            <div style={s.sectionTitle}>Approve Car - {pricingModal.model}</div>
+            
+            <div style={{ marginBottom: 16, padding: 12, background: C.subtle, borderRadius: 6 }}>
+              <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Owner: {pricingModal.ownerid || "Unknown"}</div>
+              <div style={{ fontSize: 11, color: C.muted }}>Branch: {pricingModal.branch_name || pricingModal.branchId || "Unknown"}</div>
+            </div>
+            
+            <div>
+              <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                6 Hour Price (₹) *
+              </div>
+              <input 
+                style={s.input} 
+                type="number" 
+                value={pricing.six_hr_price} 
+                onChange={e => setPricing(p => ({ ...p, six_hr_price: e.target.value }))} 
+                placeholder="e.g., 1200"
+              />
+            </div>
+            
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                12 Hour Price (₹) *
+              </div>
+              <input 
+                style={s.input} 
+                type="number" 
+                value={pricing.twelve_hr_price} 
+                onChange={e => setPricing(p => ({ ...p, twelve_hr_price: e.target.value }))} 
+                placeholder="e.g., 2000"
+              />
+            </div>
+            
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                24 Hour Price (₹) *
+              </div>
+              <input 
+                style={s.input} 
+                type="number" 
+                value={pricing.twentyfour_hr_price} 
+                onChange={e => setPricing(p => ({ ...p, twentyfour_hr_price: e.target.value }))} 
+                placeholder="e.g., 3500"
+              />
+            </div>
+            
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                Owner Percentage (%) *
+              </div>
+              <input 
+                style={s.input} 
+                type="number" 
+                value={pricing.percentage} 
+                onChange={e => setPricing(p => ({ ...p, percentage: e.target.value }))} 
+                placeholder="e.g., 70"
+              />
+              <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>
+                Owner will receive {pricing.percentage}% of the booking amount
+              </div>
+            </div>
+            
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button style={s.btn(C.green)} onClick={handleApprove}>Approve Car</button>
+              <button style={s.btn(C.muted, true)} onClick={() => setPricingModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Car Modal */}
+      {viewModal && <ViewCarModal car={viewModal} onClose={() => setViewModal(null)} />}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SECTION: FINANCIALS
+// ─────────────────────────────────────────────────────────────────────────
+function FinancialsSection({ toast }) {
+  const [finances, setFinances] = useState(null);
+  const [ownerLedger, setOwnerLedger] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [payModal, setPayModal] = useState(null);
+  const [breakdown, setBreakdown] = useState([]);
+  const [filterBranch, setFilterBranch] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [f, o] = await Promise.all([
+        apiGet("/roleauth/getSuperAdminFinances", { withAuth: true }),
+        apiGet("/roleauth/getFinancial", { withAuth: true, query: filterBranch ? { branchid: filterBranch } : {} }),
+      ]);
+      setFinances(f?.data);
+      setOwnerLedger(Array.isArray(o?.data) ? o.data : []);
+    } catch { }
+    setLoading(false);
+  }, [filterBranch]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openBreakdown = async (row) => {
+    setPayModal(row);
+    try {
+      const res = await apiGet(`/roleauth/getOwnerPendingBreakdown/${row.ownerid}`, { withAuth: true, query: { branchId: row.branchId } });
+      setBreakdown(Array.isArray(res?.data) ? res.data : []);
+    } catch { setBreakdown([]); }
+  };
+
+  const handleMarkPaid = async () => {
+    try {
+      await apiPut(`/roleauth/mark-owner-paid/${payModal.ownerid}`, { branchId: payModal.branchId }, { withAuth: true });
+      toast("Marked as paid!", "success");
+      setPayModal(null); setBreakdown([]);
+      load();
+    } catch(e) { toast(e.message,"error"); }
+  };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+      {finances && (
+        <div style={s.grid(3)}>
+          <StatCard label="Gross Revenue" value={fmt(finances.total_gross_revenue)} color={C.green} icon="💰" />
+          <StatCard label="Net Profit" value={fmt(finances.total_profit)} color={C.cyan} icon="📊" />
+          <StatCard label="Pending Owner Dues" value={fmt(finances.total_pending_dues)} color={C.amber} icon="⏳" />
+          <StatCard label="Total Owner Payouts (Paid)" value={fmt(finances.total_owner_payouts)} color={C.text} icon="✅" />
+          <StatCard label="Branch Payouts" value={fmt(finances.total_branch_payouts)} color={C.purple} icon="🏢" />
+        </div>
+      )}
+
+      <div style={s.card}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, flexWrap:"wrap", gap:8 }}>
+          <div style={s.sectionTitle}>Owner Pending Payouts</div>
+          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+            <input style={{...s.input,width:160}} placeholder="Branch ID filter" value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} />
+            <button style={s.btn(C.accent,true)} onClick={load}>Apply</button>
+          </div>
+        </div>
+        {loading ? <div style={{color:C.muted,padding:20,textAlign:"center"}}>Loading…</div> : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={s.table}>
+              <thead><tr>{["Owner","Phone","Bookings","Total Payable","Trips","Actions"].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead>
+              <tbody>
+                {ownerLedger.map((r,i)=>(
+                  <tr key={i}>
+                    <td style={{...s.td,fontWeight:600}}>{r.owner_name}</td>
+                    <td style={{...s.td,color:C.muted}}>{r.owner_phone}</td>
+                    <td style={s.td}>{r.total_bookings}</td>
+                    <td style={{...s.td,color:C.amber,fontWeight:600}}>{fmt(r.total_payable)}</td>
+                    <td style={s.td}>{r.total_trips}</td>
+                    <td style={s.td}><button style={s.btn(C.green,true)} onClick={()=>openBreakdown(r)}>View & Pay</button></td>
+                  </tr>
+                ))}
+                {ownerLedger.length===0 && <tr><td colSpan={6} style={{...s.td,color:C.muted,textAlign:"center"}}>No pending payouts</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {payModal && (
+        <div style={s.modal} onClick={()=>setPayModal(null)}>
+          <div style={{...s.modalBox,width:560}} onClick={e=>e.stopPropagation()}>
+            <div style={s.sectionTitle}>Payout Breakdown — {payModal.owner_name}</div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={s.table}>
+                <thead><tr>{["Booking","Car","Pickup","Dropoff","User Paid","Owner Share"].map(h=><th key={h} style={s.th}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {breakdown.map((b,i)=>(
+                    <tr key={i}>
+                      <td style={s.td}>#{b.booking_id}</td>
+                      <td style={s.td}>{b.car_model}</td>
+                      <td style={s.td}>{fmtDate(b.pickupDate)}</td>
+                      <td style={s.td}>{fmtDate(b.dropoffDate)}</td>
+                      <td style={s.td}>{fmt(b.total_user_paid)}</td>
+                      <td style={{...s.td,color:C.green,fontWeight:600}}>{fmt(b.owner_share)}</td>
+                    </tr>
+                  ))}
+                  {breakdown.length===0 && <tr><td colSpan={6} style={{...s.td,color:C.muted,textAlign:"center"}}>No pending trips found</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop:14, display:"flex", gap:10 }}>
+              <button style={s.btn(C.green)} onClick={handleMarkPaid}>Mark All Paid</button>
+              <button style={s.btn(C.muted,true)} onClick={()=>setPayModal(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ROOT COMPONENT
+// ─────────────────────────────────────────────────────────────────────────
+const NAV = [
+  { id:"overview",  label:"Overview",   icon:"◈" },
+  { id:"users",     label:"Users",      icon:"◉" },
+  { id:"management",label:"Management", icon:"◍" },
+  { id:"branches",  label:"Branches",   icon:"◆" },
+  { id:"cars",      label:"Cars",       icon:"◗" },
+  { id:"financials",label:"Financials", icon:"◈" },
+];
+
+export default function SuperAdminDashboard() {
+  const [active, setActive] = useState("overview");
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg, type="success") => setToast({ msg, type });
+
+  return (
+    <div style={s.root}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');
+        * { box-sizing: border-box; margin:0; padding:0; }
+        ::-webkit-scrollbar { width:5px; height:5px; }
+        ::-webkit-scrollbar-track { background: #0B0F1A; }
+        ::-webkit-scrollbar-thumb { background: #1E2A3A; border-radius:3px; }
+        button:hover { opacity:.85; }
+        input:focus, select:focus { border-color:#3B82F6 !important; }
+      `}</style>
+
+      <aside style={s.sidebar}>
+        <div style={s.logo}>
+          <div style={s.logoText}>CAR24</div>
+          <div style={s.logoSub}>Super Admin</div>
+        </div>
+        {NAV.map(n=>(
+          <div key={n.id} style={s.navItem(active===n.id)} onClick={()=>setActive(n.id)}>
+            <span style={{ fontSize:14, opacity:.7 }}>{n.icon}</span>
+            {n.label}
+          </div>
+        ))}
+        <div style={{ marginTop:"auto", padding:"12px 20px", borderTop:`1px solid ${C.border}` }}>
+          <div style={{ fontSize:10, color:C.muted, letterSpacing:2, textTransform:"uppercase" }}>Session</div>
+          <div style={{ fontSize:11, color:C.text, marginTop:4 }}>{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</div>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="main-content">
-        {/* Top Bar */}
-        <header className="top-bar">
-          <div className="page-title">
-            <h1>{tabs.find(t => t.id === activeTab)?.label}</h1>
-            <p className="breadcrumb">Dashboard / {tabs.find(t => t.id === activeTab)?.label}</p>
+      <main style={s.main}>
+        <div style={s.header}>
+          <div>
+            <div style={s.headerTitle}>{NAV.find(n=>n.id===active)?.label}</div>
+            <div style={s.headerSub}>Car24 · Super Admin Panel</div>
           </div>
-          <div className="user-info">
-            <div className="user-avatar">
-              {user?.name?.charAt(0) || "A"}
-            </div>
-            <div className="user-details">
-              <span className="user-name">{user?.name}</span>
-              <span className="user-role">Super Administrator</span>
-            </div>
+          <div style={s.pill}>
+            <span style={{ color:C.green, fontSize:8 }}>●</span>
+            Live
           </div>
-        </header>
-
-        {/* Notification Banner */}
-        {notification && (
-          <div className={`notification-banner ${notification.type}`}>
-            {notification.text}
-          </div>
-        )}
-
-        {/* Content Area */}
-        <div className="content-area">
-          {loading && (
-            <div className="loading-state">
-              <div className="spinner"></div>
-              <p>Loading data...</p>
-            </div>
-          )}
-
-          {/* Dashboard Overview Tab */}
-          {!loading && activeTab === "overview" && (
-            <div className="tab-content">
-              {/* Stats Grid */}
-              <div className="stats-grid">
-                <div className="stat-card">
-                  <div className="stat-icon">🏢</div>
-                  <div className="stat-info">
-                    <span className="stat-value">{branches.length}</span>
-                    <span className="stat-label">Total Branches</span>
-                  </div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-icon">👥</div>
-                  <div className="stat-info">
-                    <span className="stat-value">{overview?.totalUsers || 0}</span>
-                    <span className="stat-label">Active Users</span>
-                  </div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-icon">🚗</div>
-                  <div className="stat-info">
-                    <span className="stat-value">{overview?.totalCars || 0}</span>
-                    <span className="stat-label">Total Vehicles</span>
-                  </div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-icon">📅</div>
-                  <div className="stat-info">
-                    <span className="stat-value">{overview?.totalBookings || 0}</span>
-                    <span className="stat-label">Total Bookings</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Branch Revenue Table */}
-              {branchRevenue.length > 0 && (
-                <div className="data-card">
-                  <div className="card-header">
-                    <h3>Branch Performance</h3>
-                    <button className="btn-icon">📈</button>
-                  </div>
-                  <div className="table-responsive">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Branch Name</th>
-                          <th>Total Revenue</th>
-                          <th>Total Bookings</th>
-                          <th>Performance</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {branchRevenue.map((branch, idx) => (
-                          <tr key={idx}>
-                            <td>
-                              <div className="branch-name">
-                                <span className="branch-icon">🏪</span>
-                                {branch.name || branch.branch_name || "—"}
-                              </div>
-                            </td>
-                            <td className="amount">{fmt(branch.revenue || branch.total_revenue)}</td>
-                            <td>{branch.bookings || branch.total_bookings || 0}</td>
-                            <td>
-                              <div className="progress-bar">
-                                <div className="progress-fill" style={{ width: `${Math.min(100, ((branch.bookings || 0) / (branchRevenue[0]?.bookings || 1)) * 100)}%` }}></div>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Branches Tab */}
-          {!loading && activeTab === "branches" && (
-            <div className="tab-content">
-              <div className="data-card">
-                <div className="card-header">
-                  <h3>All Branches</h3>
-                  <span className="badge">{branches.length} Total</span>
-                </div>
-                <div className="table-responsive">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Branch Name</th>
-                        <th>Location</th>
-                        <th>Contact</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {branches.map((branch) => (
-                        <tr key={branch.id}>
-                          <td>#{branch.id}</td>
-                          <td>
-                            <strong>{branch.name}</strong>
-                          </td>
-                          <td>{branch.city}, {branch.state}</td>
-                          <td>{branch.phone || "—"}</td>
-                          <td><span className="status-badge active">Active</span></td>
-                          <td>
-                            <button 
-                              className="btn-secondary small"
-                              onClick={() => setBranchForm({ 
-                                id: branch.id, 
-                                name: branch.name || "", 
-                                address: branch.address || "", 
-                                city: branch.city || "", 
-                                state: branch.state || "", 
-                                zipCode: branch.zipCode || "", 
-                                phone: branch.phone || "", 
-                                email: branch.email || "" 
-                              })}>
-                              Edit
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Edit Branch Form Modal */}
-              {branchForm.id && (
-                <div className="modal-overlay">
-                  <div className="modal-content">
-                    <div className="modal-header">
-                      <h3>Edit Branch</h3>
-                      <button className="close-btn" onClick={() => setBranchForm({ id: null, name: "", address: "", city: "", state: "", zipCode: "", phone: "", email: "" })}>×</button>
-                    </div>
-                    <form onSubmit={handleUpdateBranch}>
-                      <div className="form-grid">
-                        {["name", "address", "city", "state", "zipCode", "phone", "email"].map((field) => (
-                          <div className="form-group" key={field}>
-                            <label>{field.replace(/([A-Z])/g, ' $1').trim()}</label>
-                            <input 
-                              value={branchForm[field]} 
-                              onChange={(e) => setBranchForm({ ...branchForm, [field]: e.target.value })} 
-                              placeholder={`Enter ${field}`}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      <div className="modal-footer">
-                        <button type="button" className="btn-secondary" onClick={() => setBranchForm({ id: null, name: "", address: "", city: "", state: "", zipCode: "", phone: "", email: "" })}>Cancel</button>
-                        <button type="submit" className="btn-primary">Save Changes</button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Management Tab */}
-          {!loading && activeTab === "management" && (
-            <div className="tab-content">
-              {/* Create Staff Form */}
-              <div className="data-card">
-                <div className="card-header">
-                  <h3>Add Team Member</h3>
-                </div>
-                <form onSubmit={handleCreateStaff}>
-                  <div className="form-grid">
-                    {["name", "email", "password", "mobile_no"].map((field) => (
-                      <div className="form-group" key={field}>
-                        <label>{field.replace("_", " ").toUpperCase()}</label>
-                        <input 
-                          type={field === "password" ? "password" : "text"} 
-                          value={staffForm[field]} 
-                          required
-                          onChange={(e) => setStaffForm({ ...staffForm, [field]: e.target.value })} 
-                          placeholder={`Enter ${field.replace("_", " ")}`}
-                        />
-                      </div>
-                    ))}
-                    <div className="form-group">
-                      <label>ROLE</label>
-                      <select value={staffForm.role} onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })}>
-                        <option value="staff">Staff Member</option>
-                        <option value="branch_head">Branch Head</option>
-                        <option value="admin">Administrator</option>
-                      </select>
-                    </div>
-                    {(staffForm.role === "staff" || staffForm.role === "branch_head") && (
-                      <div className="form-group">
-                        <label>ASSIGN BRANCH</label>
-                        <select value={staffForm.branchId} onChange={(e) => setStaffForm({ ...staffForm, branchId: e.target.value })} required>
-                          <option value="">Select Branch</option>
-                          {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                  <button type="submit" className="btn-primary">Create Member</button>
-                </form>
-              </div>
-
-              {/* OTP Verification Modal */}
-              {otpModal.open && (
-                <div className="modal-overlay">
-                  <div className="modal-content small">
-                    <div className="modal-header">
-                      <h3>Verify OTP</h3>
-                    </div>
-                    <form onSubmit={handleVerifyOtp}>
-                      <p>Enter the OTP sent to <strong>{otpModal.email}</strong></p>
-                      <div className="form-group">
-                        <label>OTP Code</label>
-                        <input 
-                          maxLength={6} 
-                          value={otpModal.otp} 
-                          onChange={(e) => setOtpModal({ ...otpModal, otp: e.target.value })} 
-                          required 
-                          placeholder="Enter 6-digit OTP"
-                        />
-                      </div>
-                      <div className="modal-footer">
-                        <button type="submit" className="btn-primary">Verify</button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* Team Members Table */}
-              <div className="data-card">
-                <div className="card-header">
-                  <h3>Team Members</h3>
-                  <span className="badge">{management.length} Members</span>
-                </div>
-                <div className="table-responsive">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Member</th>
-                        <th>Contact</th>
-                        <th>Role</th>
-                        <th>Branch</th>
-                        <th>Status</th>
-                        <th>Joined</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {management.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="empty-state">No team members found</td>
-                        </tr>
-                      ) : management.map((member) => (
-                        <tr key={member.id}>
-                          <td>
-                            <div className="member-info">
-                              <div className="member-avatar">{member.name?.charAt(0)}</div>
-                              <div>
-                                <div className="member-name">{member.name}</div>
-                                <div className="member-email">{member.email}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td>{member.mobile_no || "—"}</td>
-                          <td><span className={`role-badge ${member.role}`}>{member.role}</span></td>
-                          <td>{member.branch_name || "—"}</td>
-                          <td>
-                            <span className={`status-badge ${member.is_verified ? "active" : "pending"}`}>
-                              {member.is_verified ? "Verified" : "Pending"}
-                            </span>
-                          </td>
-                          <td>{fmtDate(member.created_at)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Approvals Tab */}
-          {!loading && activeTab === "approvals" && (
-            <div className="tab-content">
-              {/* Pending Owners */}
-              <div className="data-card">
-                <div className="card-header">
-                  <h3>Pending Owner Approvals</h3>
-                  <span className="badge warning">{pendingOwners.length} Pending</span>
-                </div>
-                <div className="table-responsive">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Owner Name</th>
-                        <th>Email</th>
-                        <th>Mobile</th>
-                        <th>Registered</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pendingOwners.length === 0 ? (
-                        <tr><td colSpan={5} className="empty-state">No pending owner approvals</td></tr>
-                      ) : pendingOwners.map((owner) => (
-                        <tr key={owner.id}>
-                          <td><strong>{owner.name}</strong></td>
-                          <td>{owner.email}</td>
-                          <td>{owner.mobileNo || "—"}</td>
-                          <td>{fmtDate(owner.created_at)}</td>
-                          <td>
-                            <button className="btn-success small" onClick={() => handleApproveOwner(owner.id)}>
-                              Approve
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Pending Cars */}
-              <div className="data-card">
-                <div className="card-header">
-                  <h3>Pending Vehicle Approvals</h3>
-                  <span className="badge warning">{pendingCars.length} Pending</span>
-                </div>
-                
-                {/* Approve Car Form */}
-                {approvalForm.carId && (
-                  <div className="modal-overlay">
-                    <div className="modal-content">
-                      <div className="modal-header">
-                        <h3>Set Pricing for Vehicle</h3>
-                        <button className="close-btn" onClick={() => setApprovalForm({ carId: null, six: "", twelve: "", twentyFour: "" })}>×</button>
-                      </div>
-                      <form onSubmit={handleApproveCar}>
-                        <div className="form-grid">
-                          {[
-                            ["six", "6 Hours (₹)"],
-                            ["twelve", "12 Hours (₹)"], 
-                            ["twentyFour", "24 Hours (₹)"]
-                          ].map(([key, label]) => (
-                            <div className="form-group" key={key}>
-                              <label>{label}</label>
-                              <input 
-                                type="number" 
-                                value={approvalForm[key]} 
-                                required 
-                                onChange={(e) => setApprovalForm({ ...approvalForm, [key]: e.target.value })} 
-                                placeholder="Enter amount"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                        <div className="modal-footer">
-                          <button type="submit" className="btn-success">Approve Vehicle</button>
-                        </div>
-                      </form>
-                    </div>
-                  </div>
-                )}
-
-                <div className="table-responsive">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Vehicle</th>
-                        <th>Owner</th>
-                        <th>Year</th>
-                        <th>Category</th>
-                        <th>Submitted</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pendingCars.length === 0 ? (
-                        <tr><td colSpan={6} className="empty-state">No pending vehicle approvals</td></tr>
-                      ) : pendingCars.map((car) => (
-                        <tr key={car.id}>
-                          <td><strong>{car.model}</strong></td>
-                          <td>{car.owner_name || "—"}</td>
-                          <td>{car.year}</td>
-                          <td><span className="category-badge">{car.category}</span></td>
-                          <td>{fmtDate(car.created_at)}</td>
-                          <td>
-                            <div className="action-buttons">
-                              <button className="btn-success small" onClick={() => setApprovalForm({ carId: car.id, six: "", twelve: "", twentyFour: "" })}>
-                                Approve
-                              </button>
-                              <button className="btn-danger small" onClick={() => handleRejectCar(car.id)}>
-                                Reject
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Financials Tab */}
-          {!loading && activeTab === "financials" && (
-            <div className="tab-content">
-              {/* Revenue Summary Cards */}
-              {finances && (
-                <div className="stats-grid">
-                  <div className="stat-card primary">
-                    <div className="stat-icon">💰</div>
-                    <div className="stat-info">
-                      <span className="stat-label">Total Revenue</span>
-                      <span className="stat-value">{fmt(finances.totalRevenue)}</span>
-                    </div>
-                  </div>
-                  <div className="stat-card success">
-                    <div className="stat-icon">✅</div>
-                    <div className="stat-info">
-                      <span className="stat-label">Paid Amount</span>
-                      <span className="stat-value">{fmt(finances.totalPaid)}</span>
-                    </div>
-                  </div>
-                  <div className="stat-card warning">
-                    <div className="stat-icon">⏳</div>
-                    <div className="stat-info">
-                      <span className="stat-label">Pending Amount</span>
-                      <span className="stat-value">{fmt(finances.totalPending)}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Filters */}
-              <div className="data-card">
-                <div className="card-header">
-                  <h3>Filter Transactions</h3>
-                </div>
-                <div className="filter-bar">
-                  {[
-                    ["fromDate", "From Date", "date"],
-                    ["carid", "Car ID", "text"],
-                    ["ownerid", "Owner ID", "text"],
-                    ["branchid", "Branch ID", "text"],
-                    ["status", "Status", "text"]
-                  ].map(([key, label, type]) => (
-                    <div className="filter-group" key={key}>
-                      <label>{label}</label>
-                      <input 
-                        type={type} 
-                        value={financialFilters[key]} 
-                        onChange={(e) => setFinancialFilters({ ...financialFilters, [key]: e.target.value })} 
-                        placeholder={`Filter by ${label.toLowerCase()}`}
-                      />
-                    </div>
-                  ))}
-                  <button className="btn-primary" onClick={() => loadData("financials")}>Apply Filters</button>
-                </div>
-              </div>
-
-              {/* Financial Data Table */}
-              <div className="data-card">
-                <div className="card-header">
-                  <h3>Transaction History</h3>
-                </div>
-                <div className="table-responsive">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Booking ID</th>
-                        <th>Vehicle</th>
-                        <th>Owner</th>
-                        <th>Branch</th>
-                        <th>Amount</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {financialData.length === 0 ? (
-                        <tr><td colSpan={8} className="empty-state">No transaction data found</td></tr>
-                      ) : financialData.map((record, idx) => (
-                        <tr key={idx}>
-                          <td>#{record.booking_id || record.id}</td>
-                          <td>{record.car_model || "—"}</td>
-                          <td>{record.owner_name || "—"}</td>
-                          <td>{record.branch_name || "—"}</td>
-                          <td className="amount">{fmt(record.amount || record.total_price)}</td>
-                          <td>
-                            <span className={`status-badge ${record.payment_status || record.status}`}>
-                              {record.payment_status || record.status}
-                            </span>
-                          </td>
-                          <td>{fmtDate(record.created_at)}</td>
-                          <td>
-                            {record.payment_status === "pending" && (
-                              <button className="btn-success small" onClick={() => handleMarkPaid(record.owner_id, record.branch_id)}>
-                                Mark Paid
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Payments Tab */}
-          {!loading && activeTab === "payments" && (
-            <div className="tab-content">
-              <div className="data-card">
-                <div className="card-header">
-                  <h3>Payment History</h3>
-                </div>
-                <div className="filter-bar">
-                  <div className="filter-group">
-                    <label>Branch</label>
-                    <input 
-                      value={payHistFilters.branchid} 
-                      onChange={(e) => setPayHistFilters({ ...payHistFilters, branchid: e.target.value })} 
-                      placeholder="Branch ID"
-                    />
-                  </div>
-                  <div className="filter-group">
-                    <label>Date</label>
-                    <input 
-                      type="date" 
-                      value={payHistFilters.date} 
-                      onChange={(e) => setPayHistFilters({ ...payHistFilters, date: e.target.value })} 
-                    />
-                  </div>
-                  <button className="btn-primary" onClick={() => loadData("payments")}>Search</button>
-                </div>
-
-                <div className="table-responsive">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Transaction ID</th>
-                        <th>Owner</th>
-                        <th>Branch</th>
-                        <th>Amount</th>
-                        <th>Date</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paymentHistory.length === 0 ? (
-                        <tr><td colSpan={6} className="empty-state">No payment history found</td></tr>
-                      ) : paymentHistory.map((payment, idx) => (
-                        <tr key={idx}>
-                          <td>#{payment.id}</td>
-                          <td><strong>{payment.owner_name || "—"}</strong></td>
-                          <td>{payment.branch_name || "—"}</td>
-                          <td className="amount">{fmt(payment.amount)}</td>
-                          <td>{fmtDate(payment.created_at || payment.date)}</td>
-                          <td>
-                            <span className={`status-badge ${payment.status}`}>
-                              {payment.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Settings Tab */}
-          {!loading && activeTab === "settings" && (
-            <div className="tab-content">
-              <div className="data-card">
-                <div className="card-header">
-                  <h3>Change User Password</h3>
-                </div>
-                <form onSubmit={handleChangePassword} className="settings-form">
-                  <div className="form-group">
-                    <label>User Email Address</label>
-                    <input 
-                      type="email" 
-                      value={passForm.email} 
-                      required 
-                      onChange={(e) => setPassForm({ ...passForm, email: e.target.value })} 
-                      placeholder="Enter user's email"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>New Password</label>
-                    <input 
-                      type="password" 
-                      value={passForm.pass} 
-                      required 
-                      onChange={(e) => setPassForm({ ...passForm, pass: e.target.value })} 
-                      placeholder="Enter new password"
-                    />
-                  </div>
-                  <button type="submit" className="btn-primary">Update Password</button>
-                </form>
-              </div>
-            </div>
-          )}
         </div>
-      </div>
+
+        {active==="overview"   && <OverviewSection />}
+        {active==="users"      && <UsersSection />}
+        {active==="management" && <ManagementSection toast={showToast} />}
+        {active==="branches"   && <BranchesSection toast={showToast} />}
+        {active==="cars"       && <CarsSection toast={showToast} />}
+        {active==="financials" && <FinancialsSection toast={showToast} />}
+      </main>
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={()=>setToast(null)} />}
     </div>
   );
 }

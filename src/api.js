@@ -1,6 +1,6 @@
-const raw = import.meta.env.VITE_API_URL || "";
+const raw = import.meta.env.VITE_API_URL || "http://192.168.29.152:3000";
 
-export const API_BASE = raw ? raw.replace(/\/$/, "") : "";
+export const API_BASE = raw.replace(/\/$/, "");
 
 export function decodeToken(token) {
   if (!token) return null;
@@ -20,7 +20,7 @@ export function authHeaders() {
   if (!t) return {};
   const decoded = decodeToken(t);
   const headers = {
-    authorization: `Bearer ${t}`,
+    Authorization: `Bearer ${t}`,
   };
   
   if (decoded?.branch_id) {
@@ -53,8 +53,8 @@ class ApiError extends Error {
 }
 
 export async function apiGet(path, { query, withAuth, headers } = {}) {
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  const url = new URL(cleanPath.startsWith("http") ? cleanPath : cleanPath, window.location.origin);
+  const base = path.startsWith("http") ? path : `${API_BASE}${path}`;
+  const url = new URL(base);
   if (query) {
     Object.entries(query).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));
@@ -71,7 +71,7 @@ export async function apiGet(path, { query, withAuth, headers } = {}) {
   const data = parseResponse(text);
   if (!res.ok) {
     const message = data?.message || res.statusText || "Request failed";
-    console.error(`GET ${cleanPath} failed [${res.status} ${res.statusText}]:`, { 
+    console.error(`GET ${path} failed [${res.status} ${res.statusText}]:`, { 
       message, 
       data,
       url: url.toString() 
@@ -83,7 +83,7 @@ export async function apiGet(path, { query, withAuth, headers } = {}) {
 
 export async function apiPost(path, body, { withAuth, headers } = {}) {
   const isFormData = body instanceof FormData;
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
@@ -107,7 +107,7 @@ export async function apiPost(path, body, { withAuth, headers } = {}) {
 }
 
 export async function apiPut(path, body, { withAuth, headers } = {}) {
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -130,7 +130,7 @@ export async function apiPut(path, body, { withAuth, headers } = {}) {
 }
 
 export async function apiDelete(path, { withAuth, headers } = {}) {
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -170,7 +170,7 @@ export async function userRegister(data) {
 }
 
 export async function verifyUserOtp(email, otp) {
-  return apiPut("/user/verifyuserRegister", { email, otp });
+  return apiPut("/verifyuserRegister", { email, otp });
 }
 
 export async function resendUserOtp(email) {
@@ -186,15 +186,15 @@ export async function updateProfile(id, data) {
 }
 
 export async function forgotPassOtp(email) {
-  return apiPost("/user/forgotPassOTP", { email });
+  return apiPost("/forgotPassOTP", { email });
 }
 
 export async function forgotPassOtpVerify(email, otp) {
-  return apiPost("/user/forgotPassOTPVerify", { email, otp });
+  return apiPost("/forgotPassOTPVerify", { email, otp });
 }
 
 export async function changePassword(changeToken, pass) {
-  return apiPut("/roleauth/changePass", { pass }, { headers: { Authorization: `Bearer ${changeToken}` } });
+  return apiPut("/changePass", { pass }, { headers: { Authorization: `Bearer ${changeToken}` } });
 }
 
 export async function getDocuments() {
@@ -231,37 +231,15 @@ export async function getCarStats(carId) {
 }
 
 export async function getOwnerCars() {
-  try {
-    const token = getToken();
-    if (!token) {
-      throw new Error("No authentication token found");
-    }
-    
-    const decoded = decodeToken(token);
-    const ownerId = decoded?.id || decoded?.userId;
-    
-    if (!ownerId) {
-      throw new Error("Invalid token - missing owner ID");
-    }
-    
-    console.log("Fetching cars for owner ID:", ownerId);
-    
-    const response = await apiGet("/cars/owner_cars", { 
-      withAuth: true, 
-      query: { ownerId: ownerId }
-    });
-    
-    console.log("Owner cars response:", response);
-    
-    return Array.isArray(response) ? response : [];
-  } catch (error) {
-    console.error("Failed to fetch owner cars:", error);
-    throw error;
-  }
+  const token = getToken();
+  const decoded = decodeToken(token);
+  const ownerId = decoded?.id;
+  if (!ownerId) return [];
+  return apiGet("/cars/owner_cars", { withAuth: true, query: { ownerId } });
 }
 
 export async function getCarDetails(carId) {
-  return apiGet(`/cars/get_car/${carId}`, { withAuth: true });
+  return apiGet(`/owners/get_car_details/${carId}`, { withAuth: true });
 }
 
 export async function getEarningsBreakdown(period = "all") {
@@ -281,17 +259,37 @@ export async function updateOwnerProfile(profileData) {
 }
 
 export async function addCar(branchId, formData) {
-  return apiPost(`/cars/addCar/${branchId}`, formData, { 
-    withAuth: true,
-    headers: formData instanceof FormData ? {} : {}
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/cars/addCar/${branchId}`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
   });
+  const text = await res.text();
+  const parsed = parseResponse(text);
+  if (!res.ok) {
+    const err = new Error(parsed?.message || res.statusText || "Request failed");
+    err.status = res.status;
+    throw err;
+  }
+  return parsed;
 }
 
 export async function updateCar(carId, formData) {
-  return apiPut(`/roleauth/updateCar/${carId}`, formData, { 
-    withAuth: true,
-    headers: formData instanceof FormData ? {} : {}
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/roleauth/updateCar/${carId}`, {
+    method: "PUT",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
   });
+  const text = await res.text();
+  const parsed = parseResponse(text);
+  if (!res.ok) {
+    const err = new Error(parsed?.message || res.statusText || "Request failed");
+    err.status = res.status;
+    throw err;
+  }
+  return parsed;
 }
 
 // ── Owner Approvals ────────────────────────────────────────
@@ -317,95 +315,36 @@ export async function getBranches() {
 }
 
 export async function getPendingCars() {
-  const response = await apiGet("/cars/get_pending_cars", { withAuth: true });
-  return response?.data || [];
+  return apiGet("/cars/get_pending_cars", { withAuth: true });
 }
 
-export const approveCar = async (carId, pricing) => {
-  try {
-    const response = await apiPut("/cars/approve_pending_cars/" + carId, {
-      status: 'approved',
-      six_hr_price: pricing.six,
-      twelve_hr_price: pricing.twelve,
-      twentyfour_hr_price: pricing.twentyFour,
-      percentage: pricing.percentage || 70
-    }, { withAuth: true });
-    return response;
-  } catch (error) {
-    throw new Error(error.message || "Failed to approve car");
-  }
-};
+export async function approveCar(carId, data) {
+  return apiPut(`/cars/approve_pending_cars/${carId}`, data, { withAuth: true });
+}
 
-export const rejectCar = async (carId, reason) => {
-  try {
-    const response = await apiPut("/cars/approve_pending_cars/" + carId, {
-      status: 'rejected'
-    }, { withAuth: true });
-    return response;
-  } catch (error) {
-    throw new Error(error.message || "Failed to reject car");
-  }
-};
+export async function rejectCar(carId) {
+  return apiPut(`/cars/approve_pending_cars/${carId}`, { status: 'rejected' }, { withAuth: true });
+}
 
 export async function updateCarPricing(carId, pricingData) {
-  return apiPut("/cars/approve_pending_cars/" + carId, { 
+  return apiPut(`/cars/approve_pending_cars/${carId}`, { 
     status: 'approved', 
     ...pricingData 
   }, { withAuth: true });
 }
 
-export const updateCarStatus = async (carId, status) => {
-  try {
-    const response = await apiPut(`/cars/update_car_status/${carId}`, { status }, { withAuth: true });
-    return response;
-  } catch (error) {
-    throw new Error(error.message || "Failed to update car status");
-  }
-};
-
-export const deleteCar = async (carId) => {
-  try {
-    const response = await apiDelete(`/cars/delete_car/${carId}`, { withAuth: true });
-    return response;
-  } catch (error) {
-    throw new Error(error.message || "Failed to delete car");
-  }
-};
-
 // ── Admin Management Routes ─────────────────────────────────
-export async function getUsers(id = null, role = null, number = 10, offset = 0) {
-  try {
-    const idParam = id !== null && id !== undefined && id !== "" ? id : "null";
-    const roleParam = role !== null && role !== undefined && role !== "" ? role : "null";
-    const limitParam = Number(number) || 10;
-    const offsetParam = Number(offset) || 0;
-
-    // Using roleauth getData route
-    const url = `/roleauth/getData/${idParam}/${roleParam}/${limitParam}/${offsetParam}`;
-
-    const response = await apiGet(url, { withAuth: true });
-
-    return {
-      success: true,
-      data: response?.data || [],
-      raw: response,
-    };
-  } catch (error) {
-    console.error("getUsers API Error:", error);
-    return {
-      success: false,
-      data: [],
-      message: error?.message || "Failed to fetch users",
-    };
-  }
+export async function getUsers(id = null, role = "user", number = 10, offset = 0) {
+  const idParam = id && id !== "null" && id !== "" ? id : "null";
+  // Fix: Backend getUsersData expects id/role/number/offset (4 params)
+  // When role=null, default to "user" and skip extra null param
+  const roleParam = role && role !== "null" && role !== "" ? role : "user";
+  const url = `/roleauth/getUsersData/${idParam}/${roleParam}/${number}/${offset}`;
+  return apiGet(url, { withAuth: true });
 }
 
-export async function getManagementUsers(id, branch, role, number = 10, offset = 0) {
-  const idParam = id !== undefined && id !== null && id !== "" ? id : "null";
-  const branchParam = branch !== undefined && branch !== null && branch !== "" ? branch : "null";
-  const roleParam = role !== undefined && role !== null && role !== "" ? role : "null";
-  
-  const url = `/roleauth/getManagementData/${idParam}/${branchParam}/${roleParam}/${number}/${offset}`;
+export async function getManagementUsers(id = "null", branch = "null", role = "null", number = "10", offset = "0") {
+  const url = `/roleauth/getManagementData/${id}/${branch}/${role}/${number}/${offset}`;
   try {
     const response = await apiGet(url, { withAuth: true });
     return response;
@@ -415,27 +354,89 @@ export async function getManagementUsers(id, branch, role, number = 10, offset =
   }
 }
 
-export async function getAdminCars(includeAll = true) {
+// Add these missing functions to your api.js file
+
+// Get branch bookings by date (for branch head dashboard)
+export async function getBranchBookingsByDate(branchId, date) {
   try {
-    const response = await apiGet("/roleauth/getAllData", { withAuth: true });
+    const response = await apiGet("/bookingApi/getBranchBookingsByDate", {
+      withAuth: true,
+      query: { branchId, date }
+    });
     return response;
   } catch (error) {
-    console.error("Failed to fetch cars:", error);
-    return { totalCars: 0, pendingCars: 0, totalBranches: 0, carsUsedToday: 0, verifiedUsers: 0, totalOwners: 0 };
+    console.error("Failed to get branch bookings:", error);
+    return { data: [] };
   }
 }
 
+// Get all bookings by date (for super admin)
+export async function getAllBookingsByDate(date) {
+  try {
+    const response = await apiGet("/bookingApi/getAllBookingsByDate", {
+      withAuth: true,
+      query: { date }
+    });
+    return response;
+  } catch (error) {
+    console.error("Failed to get all bookings:", error);
+    return { data: [] };
+  }
+}
+
+// Get branch dashboard stats with date
+export async function getBranchDashboardStatsWithDate(branchId, month) {
+  try {
+    const response = await apiGet(`/roleauth/branch_dashboard/${branchId}`, {
+      withAuth: true,
+      query: { month }
+    });
+    return response;
+  } catch (error) {
+    console.error("Failed to get branch dashboard stats:", error);
+    return {
+      totalBookings: 0,
+      completedBookings: 0,
+      cancelledBookings: 0,
+      onRoadToday: 0,
+      totalCars: 0,
+      idleCars: 0
+    };
+  }
+}
+
+// Get branch staff
+// export async function getBranchStaff(branchId) {
+//   try {
+//     const response = await getManagementUsers("null", branchId, "staff", 1000, 0);
+//     return response?.data || [];
+//   } catch (error) {
+//     console.error("Failed to get branch staff:", error);
+//     return [];
+//   }
+// }
+export async function getAdminCars(branchId = null, isAvailable = null, approvalstatus = null) {
+  if (branchId && branchId !== "null") {
+    const query = {};
+    if (isAvailable !== null) query.isavailable = isAvailable;
+    if (approvalstatus !== null) query.approvalstatus = approvalstatus;
+    return apiGet(`/roleauth/branch_cars/${branchId}`, { withAuth: true, query });
+  }
+  return apiGet("/cars/get_cars", { withAuth: true, query: { limit: 1000 } });
+}
+
 export async function getAdminBookings(page = 0, limit = 100, search = "") {
-  return apiGet("/roleauth/adminBookings", { withAuth: true, query: { page, limit, search } });
+  return apiGet("/bookingApi/myBookings", { withAuth: true, query: { page, limit, search } });
 }
 
 export async function getAdminOwners() {
+  // Fix: Use correct params for owner filtering
   const response = await getUsers(null, "owner", 1000, 0);
   return response?.data || [];
 }
 
 export async function getAdminStaff() {
-  const response = await getManagementUsers("null", "null", "staff", 1000, 0);
+  const response = await getManagementUsers(null, null, "staff", 1000, 0);
   return response?.data || [];
 }
 
@@ -448,8 +449,16 @@ export async function updateUserStatus(userId, status) {
   return apiPut(`/admin/users/${userId}/status`, { status }, { withAuth: true });
 }
 
+export async function updateCarStatus(carId, status) {
+  return apiPut(`/roleauth/updateCar/${carId}`, { status }, { withAuth: true });
+}
+
 export async function updateBookingStatus(bookingId, status) {
   return apiPut(`/admin/bookings/${bookingId}/status`, { status }, { withAuth: true });
+}
+
+export async function deleteCar(carId) {
+  return apiDelete(`/cars/delete_car/${carId}`, { withAuth: true });
 }
 
 export async function deleteUser(userId) {
@@ -457,6 +466,7 @@ export async function deleteUser(userId) {
 }
 
 export async function createStaff(data) {
+  // Transform data to match backend expectations
   const staffData = {
     name: data.name,
     email: data.email,
@@ -501,8 +511,7 @@ export async function updateSettings(settings) {
 // ── Admin Analytics ────────────────────────────────────────
 export async function getAdminDashboardStats() {
   try {
-    const response = await apiGet("/roleauth/getAllData", { withAuth: true });
-    return response;
+    return await apiGet("/roleauth/getAllData", { withAuth: true });
   } catch (error) {
     console.error("Failed to get dashboard stats:", error);
     return {
@@ -520,7 +529,7 @@ export async function getAdminEarningsReport(period = "month") {
   try {
     const branches = await getBranchRevenue();
     const totalRevenue = Array.isArray(branches) 
-      ? branches.reduce((sum, b) => sum + (Number(b.total_volume) || 0), 0)
+      ? branches.reduce((sum, b) => sum + (Number(b.revenue) || 0), 0)
       : 0;
     
     return {
@@ -529,20 +538,29 @@ export async function getAdminEarningsReport(period = "month") {
       period
     };
   } catch (error) {
+    // Gracefully handle branch revenue failure
     return { totalRevenue: 0, branches: [], period };
   }
 }
 
 export async function getAdminCarAnalytics() {
   try {
-    const stats = await getAdminDashboardStats();
-    return {
-      total: stats.totalCars || 0,
-      pending: stats.pendingCars || 0
-    };
+    const cars = await getAdminCars();
+    const carList = cars?.data || cars || [];
+    const byCategory = {};
+    const byFuelType = {};
+    const byTransmission = {};
+    
+    carList.forEach(car => {
+      if (car.category) byCategory[car.category] = (byCategory[car.category] || 0) + 1;
+      if (car.fuelType) byFuelType[car.fuelType] = (byFuelType[car.fuelType] || 0) + 1;
+      if (car.transmission) byTransmission[car.transmission] = (byTransmission[car.transmission] || 0) + 1;
+    });
+    
+    return { byCategory, byFuelType, byTransmission, total: carList.length };
   } catch (error) {
     console.error("Failed to get car analytics:", error);
-    return { total: 0, pending: 0 };
+    return { byCategory: {}, byFuelType: {}, byTransmission: {}, total: 0 };
   }
 }
 
@@ -576,6 +594,7 @@ export async function getBranchRevenue() {
     const response = await apiGet("/roleauth/get_branches_revenue", { withAuth: true });
     return response || [];
   } catch (error) {
+    // Silently return empty array - backend issue, don't spam console
     return [];
   }
 }
@@ -605,6 +624,12 @@ export async function getMyCredits() {
 
 export async function bookCar(data) {
   return apiPost("/bookingApi/bookCar", data, { withAuth: true });
+}
+
+export async function offlineBookCar(data) {
+  // Staff books on behalf of a user: POST /bookingApi/offlineBooking
+  // Body: { carId, userId, pickupDate, dropoffDate, totalPrice, advanceAmount, paymentMode }
+  return apiPost("/bookingApi/offlineBooking", data, { withAuth: true });
 }
 
 export async function verifyPayment(data) {
@@ -674,49 +699,29 @@ export async function collectRemainingPayment(data) {
 }
 
 // ── Branch Head Dashboard ──────────────────────────────────
-export async function getBranchDashboardStats(branchId = null) {
-  if (!branchId) {
-    const token = getToken();
-    const decoded = decodeToken(token);
-    branchId = decoded?.branch_id || decoded?.branchId || decoded?.branch;
-  }
-
-  if (!branchId) throw new Error("Branch ID missing");
-
-  return apiGet(`/roleauth/branch_dashboard/${branchId}`, {
-    withAuth: true,
-  });
+export async function getBranchDashboardStats(branchId) {
+  if (!branchId) return {};
+  return apiGet(`/roleauth/branch_dashboard/${branchId}`, { withAuth: true });
 }
 
 export async function getBranchHeadProfile() {
   return apiGet("/roleauth/getManagementProfile", { withAuth: true });
 }
 
-export async function getBranchCars(branchId = null, filters = {}) {
-  if (!branchId) {
-    const token = getToken();
-    const decoded = decodeToken(token);
-    branchId = decoded?.branch_id || decoded?.branchId || decoded?.branch;
-  }
-
-  if (!branchId) throw new Error("Branch ID missing");
-
-  return apiGet(`/roleauth/branch_cars/${branchId}`, {
-    withAuth: true,
-    query: filters,
-  });
+export async function getBranchCars(branchId, query = {}) {
+  if (!branchId) return [];
+  return apiGet(`/roleauth/branch_cars/${branchId}`, { withAuth: true, query });
 }
 
 export async function getBranchBookings(statusFilter = "all") {
-  return apiGet("/branch/bookings", { withAuth: true, query: { status: statusFilter } });
+  const query = statusFilter && statusFilter !== "all" ? { status: statusFilter } : {};
+  return apiGet("/branch/bookings", { withAuth: true, query });
 }
 
-export async function getBranchStaff() {
-  const token = getToken();
-  const decoded = decodeToken(token);
-  const branchId = decoded?.branch_id || decoded?.branchId || decoded?.branch;
-
-  return getManagementUsers("null", branchId, "staff", 1000, 0);
+export async function getBranchStaff(branchId) {
+  const id = branchId || "null";
+  const response = await getManagementUsers("null", id, "staff", "1000", "0");
+  return response?.data || [];
 }
 
 export async function getBranchActivities() {
@@ -735,21 +740,17 @@ export async function updateBranchBookingStatus(bookingId, status) {
   return apiPut(`/branch/booking/${bookingId}/status`, { status }, { withAuth: true });
 }
 
-// ── Financial ──────────────────────────────────────────────
-export async function getFinancialData(filters = {}) {
-  return apiGet("/roleauth/getFinancial", { withAuth: true, query: filters });
-}
-
+// ── Super Admin APIs ──────────────────────────────────────
 export async function getSuperAdminFinances() {
   return apiGet("/roleauth/getSuperAdminFinances", { withAuth: true });
 }
 
-export async function getPaymentHistory(branchId, date) {
-  return apiGet("/roleauth/getPaymentHistory", { withAuth: true, query: { branchid: branchId, date } });
+export async function getFinancialData(filters = {}) {
+  return apiGet("/roleauth/getFinancial", { withAuth: true, query: filters });
 }
 
-export async function getOwnerPaidBreakdown(ownerId, paidAt) {
-  return apiPost("/roleauth/getOwnerPaidBreakdown", { ownerId, paidAt }, { withAuth: true });
+export async function getPaymentHistory(filters = {}) {
+  return apiGet("/roleauth/getPaymentHistory", { withAuth: true, query: filters });
 }
 
 export async function getOwnerPendingBreakdown(ownerId, branchId) {
@@ -764,6 +765,10 @@ export async function updateBranch(branchId, data) {
   return apiPut(`/roleauth/update-branch/${branchId}`, data, { withAuth: true });
 }
 
+export async function getAllData() {
+  return apiGet("/roleauth/getAllData", { withAuth: true });
+}
+
 // ── Reviews ────────────────────────────────────────────────
 export async function addReview(reviewData) {
   return apiPost("/reviews/add_review", reviewData, { withAuth: true });
@@ -771,14 +776,6 @@ export async function addReview(reviewData) {
 
 export async function getCarReviews(carId) {
   return apiGet(`/reviews/car_reviews/${carId}`);
-}
-
-// ── Update Car Images ──────────────────────────────────────
-export async function updateCarImages(carId, formData) {
-  return apiPut(`/roleauth/updateCarImages/${carId}`, formData, { 
-    withAuth: true,
-    headers: formData instanceof FormData ? {} : {}
-  });
 }
 
 // ── Utilities ──────────────────────────────────────────────
@@ -801,8 +798,7 @@ export function calculatePrice(hours, pricing) {
   const sixHrs = Math.floor(remaining / 6);
   totalPrice += sixHrs * pricing.six_hr_price;
 
-  const platformFee = Math.ceil(totalPrice * 0.0236);
-  return totalPrice + platformFee;
+  return totalPrice; // NO PLATFORM FEE
 }
 
 export function calculateAdvanceAmount(totalHours) {
@@ -860,7 +856,6 @@ export function getStatusColor(status) {
   return colors[status] || "#6b7280";
 }
 
-
 export function getStatusText(status) {
   const texts = {
     pending: "Pending",
@@ -873,6 +868,12 @@ export function getStatusText(status) {
   };
   return texts[status] || status;
 }
+
+// Aliases for AdminDashboard compatibility
+// export const getOwners = getAdminOwners;
+// export const getBookings = getAdminBookings;
+// export const getPayments = getAdminPayments;
+// export const getBranchStaff = getBranchStaff;
 
 const api = {
   // User Auth
@@ -916,8 +917,6 @@ const api = {
   rejectCar,
   updateCarPricing,
   deleteCar,
-  updateCarStatus,
-  updateCarImages,
   
   // Admin Analytics
   getAdminDashboardStats,
@@ -937,6 +936,7 @@ const api = {
   getAdminStaff,
   getAdminPayments,
   updateUserStatus,
+  updateCarStatus,
   updateBookingStatus,
   deleteUser,
   createStaff,
@@ -946,19 +946,11 @@ const api = {
   updateSettings,
   adminChangePassword,
   
-  // Financial
-  getFinancialData,
-  getSuperAdminFinances,
-  getPaymentHistory,
-  getOwnerPaidBreakdown,
-  getOwnerPendingBreakdown,
-  markOwnerPaid,
-  updateBranch,
-  
   // Bookings
   getMyBookings,
   getMyCredits,
   bookCar,
+  offlineBookCar,
   verifyPayment,
   cancelBooking,
   checkAvailability,
@@ -989,6 +981,15 @@ const api = {
   updateBranchBookingStatus,
   getBranchHeadProfile,
   
+  // Super Admin
+  getSuperAdminFinances,
+  getFinancialData,
+  getPaymentHistory,
+  getOwnerPendingBreakdown,
+  markOwnerPaid,
+  updateBranch,
+  getAllData,
+
   // Reviews
   addReview,
   getCarReviews,
@@ -1014,7 +1015,3 @@ const api = {
 };
 
 export default api;
-
-// Fix for AdminDashboard import
-export { getAdminDashboardStats as getAllData };
-

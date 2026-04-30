@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { apiPost, apiPut, uploadOwnerDocument, verifyOwnerOtp, resendUserOtp, getToken, setToken } from "../api.js";
+import { apiPost, uploadOwnerDocument, verifyOwnerOtp, resendUserOtp, getToken } from "../api.js";
 import "../Auth.css";
 
 export default function OwnerRegister() {
@@ -78,11 +78,8 @@ export default function OwnerRegister() {
       role: "owner"
     };
 
-    console.log("[OwnerRegister] Submit payload:", payload);
-    
     try {
       const response = await apiPost("/owners/CreateOwnerAccount", payload);
-      console.log("[OwnerRegister] CreateOwnerAccount success:", response);
 
       if (response.message || response.success) {
         setMessage(response.message || "OTP sent to your email. Please verify to complete registration.");
@@ -94,8 +91,6 @@ export default function OwnerRegister() {
         setError("Registration failed. Please try again.");
       }
     } catch (err) {
-      console.error("[OwnerRegister] CreateOwnerAccount FAILED:", err);
-
       const status = err.status || 500;
       let errorMsg = err.data?.message || err.message || "Registration failed";
       
@@ -127,18 +122,14 @@ export default function OwnerRegister() {
     
     try {
       const response = await verifyOwnerOtp(form.email, otp);
-      console.log("[OwnerRegister] OTP verify success:", response);
 
       if (response.message || response.success) {
         setMessage(response.message || "Email verified! Please upload your documents to complete profile.");
-        // Token is automatically stored by verifyOwnerOtp function
         setStep("upload-docs");
       } else {
         setError("Verification failed. Please try again.");
       }
     } catch (err) {
-      console.error("[OwnerRegister] OTP verify FAILED:", err);
-
       const status = err.status || 500;
       let errorMsg = err.data?.message || err.message || "Invalid or expired OTP";
       
@@ -164,13 +155,10 @@ export default function OwnerRegister() {
       return;
     }
 
-    // Check if token exists
     const token = getToken();
-    console.log("Token exists before upload:", !!token);
     
     if (!token) {
       setUploadError("Authentication token not found. Please login again.");
-      setUploading(false);
       return;
     }
 
@@ -183,18 +171,14 @@ export default function OwnerRegister() {
 
     try {
       const response = await uploadOwnerDocument(formData);
-      console.log("[OwnerRegister] Document upload success:", response);
       setUploadMessage(response.message || "Documents uploaded successfully!");
       setTimeout(() => setStep("done"), 2000);
     } catch (err) {
-      console.error("[OwnerRegister] Document upload FAILED:", err);
-
       const status = err.status || 500;
       let errorMsg = err.data?.message || err.message || "Upload failed";
       
       if (status === 401) {
         errorMsg = "Session expired. Please login again.";
-        // Redirect to login after 2 seconds
         setTimeout(() => navigate("/owner/login"), 2000);
       } else if (status >= 500) {
         errorMsg = `Server Error (${status}): ${errorMsg}`;
@@ -214,11 +198,8 @@ export default function OwnerRegister() {
     
     try {
       const response = await resendUserOtp(form.email);
-      console.log("[OwnerRegister] Resend OTP success:", response);
       setMessage(response.message || "A new OTP has been sent to your email.");
     } catch (err) {
-      console.error("[OwnerRegister] Resend OTP FAILED:", err);
-
       const status = err.status || 500;
       let errorMsg = err.data?.message || err.message || "Could not resend OTP";
       
@@ -252,14 +233,13 @@ export default function OwnerRegister() {
       <div className="auth-container">
         <div className="auth-header">
           <h1>Register as Car Owner</h1>
-          <p className="muted">
-            List your cars on Car24 and start earning
-          </p>
+          <p className="muted">List your cars on Car24 and start earning</p>
         </div>
 
+        {/* Step 1: Registration Form */}
         {step === "form" && (
           <form className="auth-form" onSubmit={submitRegister}>
-            <div className="form-row">
+            <div className="form-grid">
               <div className="form-group">
                 <label>Full Name *</label>
                 <input
@@ -283,9 +263,7 @@ export default function OwnerRegister() {
                   required
                 />
               </div>
-            </div>
 
-            <div className="form-row">
               <div className="form-group">
                 <label>Email *</label>
                 <input
@@ -309,9 +287,7 @@ export default function OwnerRegister() {
                   required
                 />
               </div>
-            </div>
 
-            <div className="form-row">
               <div className="form-group">
                 <label>Date of Birth</label>
                 <input
@@ -333,9 +309,7 @@ export default function OwnerRegister() {
                   required
                 />
               </div>
-            </div>
 
-            <div className="form-row">
               <div className="form-group">
                 <label>Password *</label>
                 <input
@@ -359,20 +333,18 @@ export default function OwnerRegister() {
                   required
                 />
               </div>
-            </div>
 
-            <div className="form-group">
-              <label>Address</label>
-              <textarea
-                name="address"
-                rows="2"
-                placeholder="Your full address"
-                value={form.address}
-                onChange={onChange}
-              />
-            </div>
+              <div className="form-group full-width">
+                <label>Address</label>
+                <textarea
+                  name="address"
+                  rows="3"
+                  placeholder="Your full address"
+                  value={form.address}
+                  onChange={onChange}
+                />
+              </div>
 
-            <div className="form-row">
               <div className="form-group">
                 <label>City</label>
                 <input
@@ -394,9 +366,7 @@ export default function OwnerRegister() {
                   onChange={onChange}
                 />
               </div>
-            </div>
 
-            <div className="form-row">
               <div className="form-group">
                 <label>Pincode</label>
                 <input
@@ -440,24 +410,27 @@ export default function OwnerRegister() {
           </form>
         )}
 
+        {/* Step 2: OTP Verification */}
         {step === "otp" && (
           <form className="auth-form" onSubmit={submitOtp}>
-            <div className="form-group">
-              <label>OTP Code</label>
-              <input
-                type="text"
-                maxLength="6"
-                placeholder="Enter 6-digit OTP"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                required
-              />
-              <p className="muted small">
-                We sent a verification code to <strong>{form.email}</strong>
-              </p>
-              <p className="muted small">
-                OTP expires in 5 minutes
-              </p>
+            <div className="otp-container">
+              <div className="form-group">
+                <label>OTP Code</label>
+                <input
+                  type="text"
+                  maxLength="6"
+                  placeholder="Enter 6-digit OTP"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  required
+                />
+                <p className="muted small">
+                  We sent a verification code to <strong>{form.email}</strong>
+                </p>
+                <p className="muted small">
+                  OTP expires in 5 minutes
+                </p>
+              </div>
             </div>
 
             {message && <div className="banner success">{message}</div>}
@@ -503,10 +476,13 @@ export default function OwnerRegister() {
           </form>
         )}
 
+        {/* Step 3: Document Upload */}
         {step === "upload-docs" && (
           <form className="auth-form" onSubmit={handleDocumentUpload}>
-            <h3>Upload Documents</h3>
-            <p className="muted">Upload clear images of your Aadhaar and Driving License to complete your profile.</p>
+            <div className="upload-section">
+              <h3>Upload Documents</h3>
+              <p className="muted">Upload clear images of your Aadhaar and Driving License to complete your profile.</p>
+            </div>
 
             <div className="form-group">
               <label>Driving License *</label>
@@ -522,7 +498,7 @@ export default function OwnerRegister() {
                     <img 
                       src={URL.createObjectURL(licenseFile)} 
                       alt="License preview" 
-                      style={{ maxWidth: '100px', maxHeight: '100px' }} 
+                      className="file-preview-image"
                     />
                   ) : (
                     <div className="file-icon">📄</div>
@@ -546,7 +522,7 @@ export default function OwnerRegister() {
                     <img 
                       src={URL.createObjectURL(aadharFile)} 
                       alt="Aadhaar preview" 
-                      style={{ maxWidth: '100px', maxHeight: '100px' }} 
+                      className="file-preview-image"
                     />
                   ) : (
                     <div className="file-icon">📄</div>
@@ -590,6 +566,7 @@ export default function OwnerRegister() {
           </form>
         )}
 
+        {/* Step 4: Completion */}
         {step === "done" && (
           <div className="success-card">
             <div className="success-icon">✓</div>

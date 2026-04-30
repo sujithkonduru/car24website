@@ -6,10 +6,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(800px 500px at 20% 20%, rgba(20,184,166,0.06) 0%, transparent 60%),
-    radial-gradient(600px 400px at 80% 80%, rgba(46,196,230,0.05) 0%, transparent 60%),
-    #070d18;
+  /* background: */
+    /* radial-gradient(800px 500px at 20% 20%, rgba(20,184,166,0.06) 0%, transparent 60%), */
+    /* radial-gradient(600px 400px at 80% 80%, rgba(46,196,230,0.05) 0%, transparent 60%), */
+    /* #070d18; */
   padding: 2rem 1rem;
 }
 
@@ -69,7 +69,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: #8b98ab;
+  color: #2564c2;
 }
 
 .form-group input,
@@ -81,7 +81,7 @@
   border-radius: 10px;
   font-size: 0.9rem;
   font-family: inherit;
-  color: #e8edf5;
+  color: #fdfdfc;
   transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
   width: 100%;

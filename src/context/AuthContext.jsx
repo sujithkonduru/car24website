@@ -45,7 +45,7 @@ export function AuthProvider({ children }) {
   const isOwner = role === "owner";
   const isBranchHead = role === "branch_head";
   const isSubAdmin = role === "sub_admin";
-  const isStaff = ["staff", "sub_admin"].includes(role);
+  const isStaff = ["staff"].includes(role);
   const isAdmin = ["admin", "superadmin"].includes(role);
   const isManagement = ["staff", "sub_admin", "branch_head", "admin", "superadmin"].includes(role);
 

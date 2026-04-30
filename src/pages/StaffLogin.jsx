@@ -113,7 +113,7 @@ export default function StaffLogin() {
           background: rgba(201,168,76,0.1);
           border: 1px solid rgba(201,168,76,0.3);
           border-radius: 999px;
-          color: #c9a84c;
+          color: #070707;
           font-size: 0.72rem;
           font-weight: 700;
           letter-spacing: 0.06em;
