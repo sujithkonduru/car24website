@@ -1,6 +1,6 @@
 // frontend/src/api.js
 const raw = import.meta.env.VITE_API_URL;
-console.log(import.meta.env.VITE_API_URL);
+// console.log(import.meta.env.VITE_API_URL);
 
 export const API_BASE = raw.replace(/\/$/, "");
 

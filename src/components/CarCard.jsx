@@ -23,7 +23,7 @@ const TX_LABEL = {
 /* ── Status badge configurations ── */
 const STATUS_CONFIG = {
   available: { label: "Available", className: "available", icon: "✓" },
-  booked: { label: "Booked", className: "booked", icon: "✗" },
+  booked: { label: "Not Available", className: "booked", icon: "✗" },
   popular: { label: "Popular", className: "popular", icon: "🔥" },
   new: { label: "New", className: "new", icon: "✨" },
 };
