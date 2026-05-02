@@ -169,7 +169,7 @@ function BookingPanel({
         <span className="bp-trust-sep" />
         <span className="bp-trust-item"><span className="bp-trust-dot bp-trust-dot--blue" />Instant confirmation</span>
         <span className="bp-trust-sep" />
-        <span className="bp-trust-item"><span className="bp-trust-dot bp-trust-dot--teal" />30% advance only</span>
+        <span className="bp-trust-item"><span className="bp-trust-dot bp-trust-dot--teal" />Advance only</span>
       </div>
 
       {isLoggedIn && (
@@ -567,7 +567,17 @@ export default function CarDetail() {
     }
 
     const basePrice = priceResult.basePrice;
-    const advance = Math.ceil(basePrice * 0.3);
+    // advance_amount is calculated server-side; mirror the same logic here for display
+    // Backend: calculateAdvanceAmount uses slot-based fixed amounts (₹400/₹500 per slot)
+    // We approximate it here; the real value comes back in the bookCar API response
+    const diffHours = priceResult.hours;
+    let advance = 0;
+    let rem = diffHours;
+    const days = Math.floor(rem / 24); advance += days * 500; rem -= days * 24;
+    const halfs = Math.floor(rem / 12); advance += halfs * 500; rem -= halfs * 12;
+    const sixs = Math.floor(rem / 6); advance += sixs * 400;
+    // Fallback: if no slot matches, use 30% of base
+    if (advance === 0) advance = Math.ceil(basePrice * 0.3);
 
     setEstimatedPrice(basePrice);
     setPlatformFee(0);
@@ -734,10 +744,14 @@ export default function CarDetail() {
           message: res.message || "Booking confirmed successfully!",
           credits: true
         });
+        // Update advance display with real server value
+        if (res.advanceAmount) setAdvanceAmount(res.advanceAmount);
         setBookingBusy(false);
         return;
       }
 
+      // Update advance display with real server value before opening Razorpay
+      if (res.advanceAmount) setAdvanceAmount(res.advanceAmount);
       openRazorpay(res.order, res.bookingId, async (response) => {
         try {
           await finish({

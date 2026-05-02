@@ -18,14 +18,14 @@ export default function StaffLogin() {
     setError(null);
     setLoading(true);
     try {
-      const res = await apiPost("/user/userLogin", { email, password });
+      const res = await apiPost("/user/userLoginnn", { email, password });
       if (res.Logintoken) {
         login(res.Logintoken);
         const decoded = decodeToken(res.Logintoken);
         const role = decoded?.role;
         if (role === "admin" || role === "superadmin") {
           navigate("/admin/dashboard");
-        } else if (role === "branch_head" || role === "sub_admin") {
+        } else if (role === "branch_head" || role === "sub_admin" || role === "subadmin") {
           navigate("/branch/dashboard");
         } else if (role === "staff") {
           navigate("/staff/dashboard");

@@ -17,7 +17,6 @@ import {
 import { formatINR, formatDateTime } from "../utils/formatters.js";
 import api from "../api.js";
 
-// ── Colour tokens ──────────────────────────────────────────
 const C = {
   bg: "#0B0F1A",
   surface: "#111827",
@@ -34,7 +33,6 @@ const C = {
   subtle: "#1E293B",
 };
 
-// ── Styles ────────────────────────────────────────────────
 const s = {
   root: { fontFamily: "'DM Mono', 'Fira Code', monospace", background: C.bg, minHeight: "100vh", color: C.text, display: "flex" },
   sidebar: { width: 220, background: C.surface, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", padding: "24px 0", gap: 4, flexShrink: 0 },
@@ -66,7 +64,6 @@ const s = {
   searchBar: { display: "flex", alignItems: "center", gap: 12, background: C.subtle, border: `1px solid ${C.border}`, borderRadius: 6, padding: "6px 12px", flex: 1 },
 };
 
-// ── Stat Card Component ────────────────────────────────────
 function StatCard({ label, value, sub, color, icon }) {
   return (
     <div style={s.card}>
@@ -82,7 +79,6 @@ function StatCard({ label, value, sub, color, icon }) {
   );
 }
 
-// ── Toast Component ────────────────────────────────────────
 function Toast({ msg, type, onClose }) {
   useEffect(() => {
     const t = setTimeout(onClose, 3500);
@@ -95,10 +91,6 @@ function Toast({ msg, type, onClose }) {
     </div>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/* MAIN DASHBOARD COMPONENT */
-/* -------------------------------------------------------------------------- */
 
 export default function BranchHeadDashboard() {
   const navigate = useNavigate();
@@ -123,7 +115,6 @@ export default function BranchHeadDashboard() {
   const [cars, setCars] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [staff, setStaff] = useState([]);
-  const [activities, setActivities] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [bookingStatusFilter, setBookingStatusFilter] = useState("all");
 
@@ -135,10 +126,6 @@ export default function BranchHeadDashboard() {
   const [verifyError, setVerifyError] = useState(null);
 
   const showToast = (msg, type = "success") => setToast({ msg, type });
-
-  /* ---------------------------------------------------------------------- */
-  /* HELPER FUNCTIONS */
-  /* ---------------------------------------------------------------------- */
 
   const getBookingCounts = useMemo(() => {
     if (!Array.isArray(bookings)) {
@@ -175,10 +162,6 @@ export default function BranchHeadDashboard() {
       total: staff.length,
     };
   }, [staff]);
-
-  /* ---------------------------------------------------------------------- */
-  /* LOAD DATA FUNCTIONS */
-  /* ---------------------------------------------------------------------- */
 
   const loadBranchProfile = useCallback(async () => {
     try {
@@ -229,9 +212,9 @@ export default function BranchHeadDashboard() {
   const loadBranchBookings = useCallback(async (id) => {
     if (!id) return;
     try {
-      const response = await api.getBranchBookingsByDate(id, selectedMonth);
+      const dateParam = selectedMonth ? `${selectedMonth}-01` : new Date().toISOString().slice(0, 10);
+      const response = await api.getBranchBookingsByDate(id, dateParam);
       let bookingsData = response?.data || [];
-      
       if (bookingStatusFilter !== "all") {
         bookingsData = bookingsData.filter(b => 
           b.system_status?.toLowerCase() === bookingStatusFilter.toLowerCase()
@@ -285,10 +268,6 @@ export default function BranchHeadDashboard() {
   useEffect(() => {
     loadAll();
   }, [selectedMonth, bookingStatusFilter]);
-
-  /* ---------------------------------------------------------------------- */
-  /* HANDLERS */
-  /* ---------------------------------------------------------------------- */
 
   const handleLogout = () => {
     logout();
@@ -373,7 +352,6 @@ export default function BranchHeadDashboard() {
     );
   }
 
-  // Overview Tab Component
   const OverviewTab = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div style={s.grid(4)}>
@@ -382,7 +360,6 @@ export default function BranchHeadDashboard() {
         <StatCard label="On Road Today" value={stats.onRoadToday || 0} sub={`${stats.idleCars || 0} idle cars`} color={C.green} icon="🛣️" />
         <StatCard label="Staff Members" value={getStaffCounts.total} sub={`${getStaffCounts.staff} staff · ${getStaffCounts.branch_head} heads`} color={C.purple} icon="👥" />
       </div>
-
       <div style={s.card}>
         <div style={s.sectionTitle}>Booking Status Overview</div>
         <div style={s.grid(5)}>
@@ -393,7 +370,6 @@ export default function BranchHeadDashboard() {
           <div style={{ textAlign: "center", padding: 12 }}><div style={{ fontSize: 24, fontWeight: 700, color: C.red }}>{getBookingCounts.cancelled}</div><div style={{ fontSize: 11, color: C.muted }}>Cancelled</div></div>
         </div>
       </div>
-
       <div style={s.card}>
         <div style={s.sectionTitle}>Select Month</div>
         <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} style={s.input} />
@@ -401,7 +377,6 @@ export default function BranchHeadDashboard() {
     </div>
   );
 
-  // Bookings Tab Component
   const BookingsTab = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -415,53 +390,55 @@ export default function BranchHeadDashboard() {
           <input style={{ background: "transparent", border: "none", color: C.text, flex: 1, outline: "none" }} placeholder="Search customer or car..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
       </div>
-
       <div style={s.card}>
         {loading ? <div style={{ color: C.muted, padding: 20, textAlign: "center" }}>Loading bookings...</div>
-        : filteredBookings.length === 0 ? <div style={{ color: C.muted, padding: 40, textAlign: "center" }}>No bookings found for {selectedMonth}</div>
-        : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={s.table}>
-              <thead><tr>{["ID", "Customer", "Car", "Number Plate", "Pickup", "Dropoff", "Amount", "Status", "Live Status", "Actions"].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
-              <tbody>
-                {filteredBookings.map((b) => (
-                  <tr key={b.booking_id}>
-                    <td style={s.td}>#{b.booking_id}</td>
-                    <td style={s.td}><div style={{ fontWeight: 600 }}>{b.customer_name}</div><small style={{ color: C.muted }}>{b.customer_phone}</small></td>
-                    <td style={s.td}>{b.car_model}</td>
-                    <td style={s.td}>{b.number_plate}</td>
-                    <td style={{ ...s.td, color: C.muted }}>{formatDateTime(b.pickupDate)}</td>
-                    <td style={{ ...s.td, color: C.muted }}>{formatDateTime(b.dropoffDate)}</td>
-                    <td style={{ ...s.td, color: C.green, fontWeight: 600 }}>{formatINR(b.totalPrice)}</td>
-                    <td style={s.td}><span style={s.badge(getStatusColor(b.system_status))}>{getStatusText(b.system_status)}</span></td>
-                    <td style={s.td}><span style={s.tag(b.live_status === "ongoing" ? C.purple : b.live_status === "completed" ? C.green : C.muted)}>{b.live_status || "—"}</span></td>
-                    <td style={s.td}>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {b.system_status === "pending" && (
-                          <>
-                            <button style={s.btn(C.green)} onClick={() => handleStatusUpdate(b.booking_id, "confirmed")}><CheckCircle size={14} style={{ marginRight: 4 }} />Confirm</button>
-                            <button style={s.btn(C.red, true)} onClick={() => handleStatusUpdate(b.booking_id, "cancelled")}><XCircle size={14} style={{ marginRight: 4 }} />Cancel</button>
-                          </>
-                        )}
-                        {b.system_status === "confirmed" && (
-                          <button style={s.btn(C.accent)} onClick={() => { setSelectedBooking(b); setVerifyAction("start"); setShowVerifyModal(true); }}><Key size={14} style={{ marginRight: 4 }} />Start Ride</button>
-                        )}
-                        {b.live_status === "ongoing" && (
-                          <button style={s.btn(C.purple)} onClick={() => { setSelectedBooking(b); setVerifyAction("end"); setShowVerifyModal(true); }}><CheckCircle size={14} style={{ marginRight: 4 }} />End Ride</button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          : filteredBookings.length === 0 ? <div style={{ color: C.muted, padding: 40, textAlign: "center" }}>No bookings found for {selectedMonth}</div>
+            : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={s.table}>
+                  <thead>
+                    <tr>
+                      {["ID", "Customer", "Car", "Number Plate", "Pickup", "Dropoff", "Amount", "Status", "Live Status", "Actions"].map(h => <th key={h} style={s.th}>{h}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredBookings.map((b) => (
+                      <tr key={b.booking_id}>
+                        <td style={s.td}>#{b.booking_id}</td>
+                        <td style={s.td}><div style={{ fontWeight: 600 }}>{b.customer_name}</div><small style={{ color: C.muted }}>{b.customer_phone}</small></td>
+                        <td style={s.td}>{b.car_model}</td>
+                        <td style={s.td}>{b.number_plate}</td>
+                        <td style={{ ...s.td, color: C.muted }}>{formatDateTime(b.pickupDate)}</td>
+                        <td style={{ ...s.td, color: C.muted }}>{formatDateTime(b.dropoffDate)}</td>
+                        <td style={{ ...s.td, color: C.green, fontWeight: 600 }}>{formatINR(b.totalPrice)}</td>
+                        <td style={s.td}><span style={s.badge(getStatusColor(b.system_status))}>{getStatusText(b.system_status)}</span></td>
+                        <td style={s.td}><span style={s.tag(b.live_status === "ongoing" ? C.purple : b.live_status === "completed" ? C.green : C.muted)}>{b.live_status || "—"}</span></td>
+                        <td style={s.td}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {b.system_status === "pending" && (
+                              <>
+                                <button style={s.btn(C.green)} onClick={() => handleStatusUpdate(b.booking_id, "confirmed")}><CheckCircle size={14} style={{ marginRight: 4 }} />Confirm</button>
+                                <button style={s.btn(C.red, true)} onClick={() => handleStatusUpdate(b.booking_id, "cancelled")}><XCircle size={14} style={{ marginRight: 4 }} />Cancel</button>
+                              </>
+                            )}
+                            {b.system_status === "confirmed" && (
+                              <button style={s.btn(C.accent)} onClick={() => { setSelectedBooking(b); setVerifyAction("start"); setShowVerifyModal(true); }}><Key size={14} style={{ marginRight: 4 }} />Start Ride</button>
+                            )}
+                            {b.live_status === "ongoing" && (
+                              <button style={s.btn(C.purple)} onClick={() => { setSelectedBooking(b); setVerifyAction("end"); setShowVerifyModal(true); }}><CheckCircle size={14} style={{ marginRight: 4 }} />End Ride</button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
       </div>
     </div>
   );
 
-  // Cars Tab Component
   const CarsTab = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
@@ -470,30 +447,33 @@ export default function BranchHeadDashboard() {
       </div>
       <div style={s.card}>
         {loading ? <div style={{ color: C.muted, padding: 20, textAlign: "center" }}>Loading cars...</div>
-        : cars.length === 0 ? <div style={{ color: C.muted, padding: 40, textAlign: "center" }}>No cars found in your branch</div>
-        : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={s.table}>
-              <thead><tr>{["ID", "Model", "License Plate", "Status", "Pricing (6h/12h/24h)"].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
-              <tbody>
-                {cars.map((car) => (
-                  <tr key={car.id}>
-                    <td style={s.td}>#{car.id}</td>
-                    <td style={s.td}><div style={{ fontWeight: 600 }}>{car.model}</div><small style={{ color: C.muted }}>{car.year} · {car.transmission} · {car.seating_capacity} seats</small></td>
-                    <td style={s.td}>{car.license_plate || car.licensePlate}</td>
-                    <td style={s.td}><span style={s.tag(car.isAvailable || car.is_available ? C.green : C.red)}>{car.isAvailable || car.is_available ? "Available" : "Unavailable"}</span></td>
-                    <td style={s.td}><div style={{ display: "flex", gap: 8 }}><span>6h: {formatINR(car.six_hr_price)}</span><span>12h: {formatINR(car.twelve_hr_price)}</span><span>24h: {formatINR(car.twentyfour_hr_price)}</span></div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          : cars.length === 0 ? <div style={{ color: C.muted, padding: 40, textAlign: "center" }}>No cars found in your branch</div>
+            : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={s.table}>
+                  <thead>
+                    <tr>
+                      {["ID", "Model", "License Plate", "Status", "Pricing (6h/12h/24h)"].map(h => <th key={h} style={s.th}>{h}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cars.map((car) => (
+                      <tr key={car.id}>
+                        <td style={s.td}>#{car.id}</td>
+                        <td style={s.td}><div style={{ fontWeight: 600 }}>{car.model}</div><small style={{ color: C.muted }}>{car.year} · {car.transmission} · {car.seating_capacity} seats</small></td>
+                        <td style={s.td}>{car.license_plate || car.licensePlate}</td>
+                        <td style={s.td}><span style={s.tag(car.isAvailable || car.is_available ? C.green : C.red)}>{car.isAvailable || car.is_available ? "Available" : "Unavailable"}</span></td>
+                        <td style={s.td}><div style={{ display: "flex", gap: 8 }}><span>6h: {formatINR(car.six_hr_price)}</span><span>12h: {formatINR(car.twelve_hr_price)}</span><span>24h: {formatINR(car.twentyfour_hr_price)}</span></div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
       </div>
     </div>
   );
 
-  // Staff Tab Component
   const StaffTab = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
@@ -503,24 +483,28 @@ export default function BranchHeadDashboard() {
       </div>
       <div style={s.card}>
         {loading ? <div style={{ color: C.muted, padding: 20, textAlign: "center" }}>Loading staff...</div>
-        : staff.length === 0 ? <div style={{ color: C.muted, padding: 40, textAlign: "center" }}>No staff members found</div>
-        : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={s.table}>
-              <thead><tr>{["Name", "Email", "Role", "Status"].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
-              <tbody>
-                {staff.map((emp) => (
-                  <tr key={emp.id}>
-                    <td style={{ ...s.td, fontWeight: 600 }}>{emp.name}</td>
-                    <td style={s.td}>{emp.email}</td>
-                    <td style={s.td}><span style={s.tag(emp.role === "branch_head" ? C.green : C.accent)}>{emp.role === "branch_head" ? "Branch Head" : emp.role || "Staff"}</span></td>
-                    <td style={s.td}><span style={s.badge(emp.is_verified ? C.green : C.amber)}>{emp.is_verified ? "Active" : "Pending"}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          : staff.length === 0 ? <div style={{ color: C.muted, padding: 40, textAlign: "center" }}>No staff members found</div>
+            : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={s.table}>
+                  <thead>
+                    <tr>
+                      {["Name", "Email", "Role", "Status"].map(h => <th key={h} style={s.th}>{h}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {staff.map((emp) => (
+                      <tr key={emp.id}>
+                        <td style={{ ...s.td, fontWeight: 600 }}>{emp.name}</td>
+                        <td style={s.td}>{emp.email}</td>
+                        <td style={s.td}><span style={s.tag(emp.role === "branch_head" ? C.green : C.accent)}>{emp.role === "branch_head" ? "Branch Head" : emp.role || "Staff"}</span></td>
+                        <td style={s.td}><span style={s.badge(emp.is_verified ? C.green : C.amber)}>{emp.is_verified ? "Active" : "Pending"}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
       </div>
     </div>
   );
@@ -528,14 +512,12 @@ export default function BranchHeadDashboard() {
   return (
     <div style={s.root}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap');*{box-sizing:border-box;margin:0;padding:0;}::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:#0B0F1A;}::-webkit-scrollbar-thumb{background:#1E2A3A;border-radius:3px;}button:hover{opacity:.85;}input:focus,select:focus{border-color:#3B82F6 !important;}`}</style>
-
       <aside style={s.sidebar}>
         <div style={s.logo}><div style={s.logoText}>CAR24</div><div style={s.logoSub}>{isSubAdmin ? "Sub Admin" : "Branch Head"}</div></div>
         <div style={{ padding: "0 20px 16px" }}><div style={s.pill}><MapPin size={12} /><span style={{ fontSize: 11 }}>{branchInfo?.branch_name || user?.branch_name || "Branch"}</span></div></div>
         {navItems.map((item) => (<div key={item.id} style={s.navItem(activeTab === item.id)} onClick={() => setActiveTab(item.id)}><span style={{ fontSize: 14, opacity: 0.7 }}>{item.icon}</span>{item.label}</div>))}
         <div style={{ marginTop: "auto", padding: "12px 20px", borderTop: `1px solid ${C.border}` }}><button style={{ ...s.btn(C.red, true), width: "100%" }} onClick={handleLogout}><LogOut size={14} style={{ marginRight: 8 }} />Logout</button></div>
       </aside>
-
       <main style={s.main}>
         <div style={s.header}>
           <div><div style={s.headerTitle}>{navItems.find((n) => n.id === activeTab)?.label}</div><div style={s.headerSub}>Welcome back, {branchInfo?.name || user?.name || "User"} · {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</div></div>
@@ -546,7 +528,6 @@ export default function BranchHeadDashboard() {
         {activeTab === "cars" && <CarsTab />}
         {activeTab === "staff" && <StaffTab />}
       </main>
-
       {showVerifyModal && (
         <div style={s.modal} onClick={() => setShowVerifyModal(false)}>
           <div style={s.modalBox} onClick={(e) => e.stopPropagation()}>

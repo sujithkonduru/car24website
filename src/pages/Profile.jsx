@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiGet, apiPost, apiPut } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { toastSuccess, toastError } from "../hooks/useToast.js";
 import {
   User, Mail, Phone, Calendar, MapPin, CreditCard, Car, Upload,
   FileText, CheckCircle, AlertCircle, X, Plus, Camera, Trash2,
@@ -58,32 +59,27 @@ export default function Profile() {
     try {
       let profileRes;
 
-      if (role === 'branch_head') {
+      if (role === 'branch_head' || role === 'sub_admin' || role === 'staff' || role === 'admin' || role === 'superadmin') {
         try {
-          profileRes = await apiGet("/branch/profile", { withAuth: true });
-
-          if (profileRes?.success && profileRes?.data) {
-            const data = profileRes.data;
-            profileRes = {
-              userData: {
-                id: data.id,
-                name: data.name,
-                email: data.email,
-                mobileno: data.mobileno,
-                role: data.role,
-                branch_id: data.branch,
-                branch_name: data.branch_details?.name,
-                city: data.branch_details?.city,
-                state: data.branch_details?.state,
-                is_verified: data.is_verified,
-                created_at: data.created_at
-              }
-            };
-          } else {
-            throw new Error(profileRes?.message || "Failed to load profile");
-          }
-        } catch (branchError) {
-          console.error("Branch profile error:", branchError);
+          profileRes = await apiGet("/roleauth/getManagementProfile", { withAuth: true });
+          // Backend returns flat object: { id, name, email, mobile_no, role, branch_id, branch_name, ... }
+          profileRes = {
+            userData: {
+              id: profileRes.id,
+              name: profileRes.name,
+              email: profileRes.email,
+              mobileno: profileRes.mobile_no,
+              role: profileRes.role,
+              branch_id: profileRes.branch_id,
+              branch_name: profileRes.branch_name,
+              city: profileRes.branch_city,
+              state: profileRes.branch_state,
+              is_verified: profileRes.is_verified,
+              created_at: profileRes.created_at
+            }
+          };
+        } catch (mgmtError) {
+          console.error("Management profile error:", mgmtError);
           profileRes = {
             userData: {
               id: user?.id,
@@ -301,7 +297,7 @@ export default function Profile() {
     try {
       await apiPost(`/cars/addCar/${carForm.branchId}`, formData, { withAuth: true });
 
-      alert("Car registered successfully! Waiting for approval.");
+      toastSuccess("Car registered successfully! Waiting for approval.");
       setShowCarModal(false);
       setCarForm({
         branchId: "",
@@ -320,7 +316,7 @@ export default function Profile() {
       });
       await load();
     } catch (err) {
-      setCarError(err.response?.data?.message || "Failed to register car");
+      setCarError(err.data?.message || err.message || "Failed to register car");
     } finally {
       setCarLoading(false);
     }

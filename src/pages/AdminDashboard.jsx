@@ -279,7 +279,7 @@ export default function AdminDashboard() {
           <StatCard 
             label="Net Profit" 
             value={fmt(finances?.total_profit || 0)} 
-            sub="superadmin + branch" 
+            sub="admin + branch" 
             color={C.cyan} 
             icon="📈" 
           />
@@ -616,7 +616,7 @@ export default function AdminDashboard() {
       <aside style={s.sidebar}>
         <div style={s.logo}>
           <div style={s.logoText}>CAR24</div>
-          <div style={s.logoSub}>{branchId ? "Branch Admin" : "Super Admin"}</div>
+          <div style={s.logoSub}>{branchId ? "Branch Admin" : "Admin"}</div>
         </div>
 
         <div style={{ padding: "0 20px 16px" }}>

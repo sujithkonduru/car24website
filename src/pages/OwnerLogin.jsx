@@ -18,9 +18,15 @@ export default function OwnerLogin() {
     setLoading(true);
     try {
       const res = await ownerLogin(email, password);
-      if (res.token) {
-        login(res.token);
+      // Unified login returns Logintoken
+      const token = res.Logintoken || res.token;
+      if (token) {
+        login(token);
         navigate("/owner/dashboard");
+        return;
+      }
+      if (res.Verification_token) {
+        setError("Account not verified. Please check your email for the OTP.");
         return;
       }
       setError("Login failed. Please check your credentials.");

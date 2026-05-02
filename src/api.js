@@ -1,4 +1,7 @@
-const raw = import.meta.env.VITE_API_URL || "http://192.168.29.152:3000";
+// frontend/src/api.js
+const raw = typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL
+  ? import.meta.env.VITE_API_URL
+  : "http://localhost:3000";
 
 export const API_BASE = raw.replace(/\/$/, "");
 
@@ -71,12 +74,14 @@ export async function apiGet(path, { query, withAuth, headers } = {}) {
   const data = parseResponse(text);
   if (!res.ok) {
     const message = data?.message || res.statusText || "Request failed";
-    console.error(`GET ${path} failed [${res.status} ${res.statusText}]:`, { 
-      message, 
+    console.error(`GET ${path} failed [${res.status} ${res.statusText}]:`, {
+      message,
       data,
-      url: url.toString() 
+      url: url.toString()
     });
-    throw new ApiError(message, res.status, res.status, data);
+    const err = new ApiError(message, res.status, res.status, data);
+    err.data = data;
+    throw err;
   }
   return data;
 }
@@ -170,35 +175,35 @@ export async function userRegister(data) {
 }
 
 export async function verifyUserOtp(email, otp) {
-  return apiPut("/verifyuserRegister", { email, otp });
+  return apiPut("/user/verifyuserRegister", { email, otp });
 }
 
 export async function resendUserOtp(email) {
-  return apiPost("/resendOTP", { email });
+  return apiPost("/user/resendOTP", { email });
 }
 
 export async function getUserData() {
-  return apiGet("/getData", { withAuth: true });
+  return apiGet("/user/getData", { withAuth: true });
 }
 
 export async function updateProfile(id, data) {
-  return apiPut(`/UpdateProfile/${id}`, data, { withAuth: true });
+  return apiPut(`/user/UpdateProfile/${id}`, data, { withAuth: true });
 }
 
 export async function forgotPassOtp(email) {
-  return apiPost("/forgotPassOTP", { email });
+  return apiPost("/user/forgotPassOTP", { email });
 }
 
 export async function forgotPassOtpVerify(email, otp) {
-  return apiPost("/forgotPassOTPVerify", { email, otp });
+  return apiPost("/user/forgotPassOTPVerify", { email, otp });
 }
 
 export async function changePassword(changeToken, pass) {
-  return apiPut("/changePass", { pass }, { headers: { Authorization: `Bearer ${changeToken}` } });
+  return apiPut("/user/changePass", { pass }, { headers: { Authorization: `Bearer ${changeToken}` } });
 }
 
 export async function getDocuments() {
-  return apiGet("/getDocuments", { withAuth: true });
+  return apiGet("/user/getDocuments", { withAuth: true });
 }
 
 // ── Owner Auth ─────────────────────────────────────────────
@@ -215,7 +220,7 @@ export async function verifyOwnerOtp(email, otp) {
 }
 
 export async function resendOwnerOtp(email) {
-  return apiPost("/owners/resendOwnerOTP", { email });
+  return apiPost("/user/resendOTP", { email });
 }
 
 export async function getOwnerData() {
@@ -223,11 +228,63 @@ export async function getOwnerData() {
 }
 
 export async function getOwnerDashboardData() {
-  return apiGet("/owners/getOwnerData", { withAuth: true });
+  const emptyStats = {
+    total_bookings: 0, total_earnings: 0, total_deductions: 0,
+    net_earnings: 0, today_earnings: 0, week_earnings: 0,
+    month_earnings: 0, active_rides: 0, upcoming_rides: 0, total_trips: 0,
+  };
+  try {
+    const response = await apiGet("/owners/getOwnerData", { withAuth: true });
+    console.log("Owner dashboard response:", response);
+    
+    const stats = response?.stats || emptyStats;
+    
+    return {
+      owner: response?.owner || null,
+      cars: response?.cars || [],
+      stats: {
+        total_bookings:  stats.total_bookings || 0,
+        total_earnings:  stats.all_time_gross || stats.total_earnings || 0,
+        total_deductions: stats.all_time_deductions || stats.total_deductions || 0,
+        net_earnings:    stats.all_time_net || stats.net_earnings || 0,
+        today_earnings:  stats.today_earnings || 0,
+        week_earnings:   stats.week_earnings || 0,
+        month_earnings:  stats.month_earnings || 0,
+        active_rides:    stats.active_rides || 0,
+        upcoming_rides:  stats.upcoming_rides || 0,
+        total_trips:     stats.total_trips || 0,
+      },
+      chart: response?.chart || [],
+      breakdown: response?.breakdown || [],
+    };
+  } catch (error) {
+    console.error("Failed to get owner dashboard data:", error);
+    return { owner: null, cars: [], stats: emptyStats, chart: [], breakdown: [] };
+  }
 }
 
 export async function getCarStats(carId) {
   return apiGet(`/owners/getCarStats/${carId}`, { withAuth: true });
+}
+
+export async function deleteCar(carId) {
+  try {
+    const response = await apiDelete(`/cars/delete_car/${carId}`, { withAuth: true });
+    return response;
+  } catch (error) {
+    console.error("Failed to delete car:", error);
+    throw error;
+  }
+}
+
+export async function updateCarStatus(carId, status) {
+  try {
+    const response = await apiPut(`/roleauth/updateCar/${carId}`, { status }, { withAuth: true });
+    return response;
+  } catch (error) {
+    console.error("Failed to update car status:", error);
+    throw error;
+  }
 }
 
 export async function getOwnerCars() {
@@ -336,8 +393,6 @@ export async function updateCarPricing(carId, pricingData) {
 // ── Admin Management Routes ─────────────────────────────────
 export async function getUsers(id = null, role = "user", number = 10, offset = 0) {
   const idParam = id && id !== "null" && id !== "" ? id : "null";
-  // Fix: Backend getUsersData expects id/role/number/offset (4 params)
-  // When role=null, default to "user" and skip extra null param
   const roleParam = role && role !== "null" && role !== "" ? role : "user";
   const url = `/roleauth/getUsersData/${idParam}/${roleParam}/${number}/${offset}`;
   return apiGet(url, { withAuth: true });
@@ -354,166 +409,11 @@ export async function getManagementUsers(id = "null", branch = "null", role = "n
   }
 }
 
-// Add these missing functions to your api.js file
-
-// Get branch bookings by date (for branch head dashboard)
-export async function getBranchBookingsByDate(branchId, date) {
-  try {
-    const response = await apiGet("/bookingApi/getBranchBookingsByDate", {
-      withAuth: true,
-      query: { branchId, date }
-    });
-    return response;
-  } catch (error) {
-    console.error("Failed to get branch bookings:", error);
-    return { data: [] };
-  }
-}
-
-// Get all bookings by date (for super admin)
-export async function getAllBookingsByDate(date) {
-  try {
-    const response = await apiGet("/bookingApi/getAllBookingsByDate", {
-      withAuth: true,
-      query: { date }
-    });
-    return response;
-  } catch (error) {
-    console.error("Failed to get all bookings:", error);
-    return { data: [] };
-  }
-}
-
-// Get branch dashboard stats with date
-export async function getBranchDashboardStatsWithDate(branchId, month) {
-  try {
-    const response = await apiGet(`/roleauth/branch_dashboard/${branchId}`, {
-      withAuth: true,
-      query: { month }
-    });
-    return response;
-  } catch (error) {
-    console.error("Failed to get branch dashboard stats:", error);
-    return {
-      totalBookings: 0,
-      completedBookings: 0,
-      cancelledBookings: 0,
-      onRoadToday: 0,
-      totalCars: 0,
-      idleCars: 0
-    };
-  }
-}
-
-// Get branch staff
-// export async function getBranchStaff(branchId) {
-//   try {
-//     const response = await getManagementUsers("null", branchId, "staff", 1000, 0);
-//     return response?.data || [];
-//   } catch (error) {
-//     console.error("Failed to get branch staff:", error);
-//     return [];
-//   }
-// }
-export async function getAdminCars(branchId = null, isAvailable = null, approvalstatus = null) {
-  if (branchId && branchId !== "null") {
-    const query = {};
-    if (isAvailable !== null) query.isavailable = isAvailable;
-    if (approvalstatus !== null) query.approvalstatus = approvalstatus;
-    return apiGet(`/roleauth/branch_cars/${branchId}`, { withAuth: true, query });
-  }
-  return apiGet("/cars/get_cars", { withAuth: true, query: { limit: 1000 } });
-}
-
-export async function getAdminBookings(page = 0, limit = 100, search = "") {
-  return apiGet("/bookingApi/myBookings", { withAuth: true, query: { page, limit, search } });
-}
-
-export async function getAdminOwners() {
-  // Fix: Use correct params for owner filtering
-  const response = await getUsers(null, "owner", 1000, 0);
-  return response?.data || [];
-}
-
-export async function getAdminStaff() {
-  const response = await getManagementUsers(null, null, "staff", 1000, 0);
-  return response?.data || [];
-}
-
-export async function getAdminPayments() {
-  const response = await getUsers(null, "owner", 1000, 0);
-  return response?.data || [];
-}
-
-export async function updateUserStatus(userId, status) {
-  return apiPut(`/admin/users/${userId}/status`, { status }, { withAuth: true });
-}
-
-export async function updateCarStatus(carId, status) {
-  return apiPut(`/roleauth/updateCar/${carId}`, { status }, { withAuth: true });
-}
-
-export async function updateBookingStatus(bookingId, status) {
-  return apiPut(`/admin/bookings/${bookingId}/status`, { status }, { withAuth: true });
-}
-
-export async function deleteCar(carId) {
-  return apiDelete(`/cars/delete_car/${carId}`, { withAuth: true });
-}
-
-export async function deleteUser(userId) {
-  return apiDelete(`/admin/users/${userId}`, { withAuth: true });
-}
-
-export async function createStaff(data) {
-  // Transform data to match backend expectations
-  const staffData = {
-    name: data.name,
-    email: data.email,
-    password: data.password,
-    role: data.role,
-    mobile_no: data.mobile_no || data.phone || "",
-    address: data.address || "",
-    branch: data.branchId || data.branch || null,
-    dob: data.dob || null,
-    marrieddate: data.marrieddate || null,
-    permissions: data.permissions || []
-  };
-  return apiPost("/roleauth/createMangement", staffData, { withAuth: true });
-}
-
-export async function deleteStaff(staffId) {
-  return apiDelete(`/admin/staff/${staffId}`, { withAuth: true });
-}
-
-export async function verifyStaffRegister(email, otp) {
-  return apiPut("/roleauth/verifyManagementRegister", { email, otp }, { withAuth: true });
-}
-
-export async function getSettings() {
-  const savedSettings = localStorage.getItem("app_settings");
-  if (savedSettings) {
-    return JSON.parse(savedSettings);
-  }
-  return {
-    siteName: "Car24",
-    contactEmail: "support@car24.com",
-    platformFee: 2.36,
-    bookingPrefix: "CAR24"
-  };
-}
-
-export async function updateSettings(settings) {
-  localStorage.setItem("app_settings", JSON.stringify(settings));
-  return settings;
-}
-
 // ── Admin Analytics ────────────────────────────────────────
 export async function getAdminDashboardStats() {
   try {
     return await apiGet("/roleauth/getAllData", { withAuth: true });
   } catch (error) {
-    console.error("Failed to get dashboard stats:", error);
     return {
       totalCars: 0,
       pendingCars: 0,
@@ -525,76 +425,11 @@ export async function getAdminDashboardStats() {
   }
 }
 
-export async function getAdminEarningsReport(period = "month") {
-  try {
-    const branches = await getBranchRevenue();
-    const totalRevenue = Array.isArray(branches) 
-      ? branches.reduce((sum, b) => sum + (Number(b.revenue) || 0), 0)
-      : 0;
-    
-    return {
-      totalRevenue,
-      branches: branches || [],
-      period
-    };
-  } catch (error) {
-    // Gracefully handle branch revenue failure
-    return { totalRevenue: 0, branches: [], period };
-  }
-}
-
-export async function getAdminCarAnalytics() {
-  try {
-    const cars = await getAdminCars();
-    const carList = cars?.data || cars || [];
-    const byCategory = {};
-    const byFuelType = {};
-    const byTransmission = {};
-    
-    carList.forEach(car => {
-      if (car.category) byCategory[car.category] = (byCategory[car.category] || 0) + 1;
-      if (car.fuelType) byFuelType[car.fuelType] = (byFuelType[car.fuelType] || 0) + 1;
-      if (car.transmission) byTransmission[car.transmission] = (byTransmission[car.transmission] || 0) + 1;
-    });
-    
-    return { byCategory, byFuelType, byTransmission, total: carList.length };
-  } catch (error) {
-    console.error("Failed to get car analytics:", error);
-    return { byCategory: {}, byFuelType: {}, byTransmission: {}, total: 0 };
-  }
-}
-
-export async function getAdminOwnerAnalytics() {
-  try {
-    const owners = await getAdminOwners();
-    const ownerList = Array.isArray(owners) ? owners : [];
-    const verified = ownerList.filter(o => o.is_verified).length;
-    
-    return {
-      total: ownerList.length,
-      verified,
-      pending: ownerList.length - verified
-    };
-  } catch (error) {
-    console.error("Failed to get owner analytics:", error);
-    return { total: 0, verified: 0, pending: 0 };
-  }
-}
-
-export async function getAdminBranchPerformance() {
-  try {
-    return await getBranchRevenue();
-  } catch {
-    return [];
-  }
-}
-
 export async function getBranchRevenue() {
   try {
     const response = await apiGet("/roleauth/get_branches_revenue", { withAuth: true });
     return response || [];
   } catch (error) {
-    // Silently return empty array - backend issue, don't spam console
     return [];
   }
 }
@@ -604,7 +439,6 @@ export async function getBranchIncome(branchId) {
     const response = await apiGet(`/roleauth/get_income/${branchId}`, { withAuth: true });
     return response?.data || [];
   } catch (error) {
-    console.error("Failed to get branch income:", error);
     return [];
   }
 }
@@ -627,9 +461,7 @@ export async function bookCar(data) {
 }
 
 export async function offlineBookCar(data) {
-  // Staff books on behalf of a user: POST /bookingApi/offlineBooking
-  // Body: { carId, userId, pickupDate, dropoffDate, totalPrice, advanceAmount, paymentMode }
-  return apiPost("/bookingApi/offlineBooking", data, { withAuth: true });
+  return apiPost("/bookingApi/bookCar", data, { withAuth: true });
 }
 
 export async function verifyPayment(data) {
@@ -637,7 +469,7 @@ export async function verifyPayment(data) {
 }
 
 export async function cancelBooking(id) {
-  return apiPost(`/bookingApi/cancelBooking/${id}`, {}, { withAuth: true });
+  return apiPost(`/bookingApi/request-cancel/${id}`, {}, { withAuth: true });
 }
 
 export async function checkAvailability(carId, pickupDate, dropoffDate) {
@@ -648,9 +480,10 @@ export async function getBookingDetails(bookingId) {
   return apiGet(`/bookingApi/getBooking/${bookingId}`, { withAuth: true });
 }
 
-// ── Staff / Management ─────────────────────────────────────
-export async function getStaffTasks() {
-  return apiGet("/bookingApi/getStaffTasks", { withAuth: true });
+// ── Staff ─────────────────────────────────────────────────
+export async function getStaffTasks(date) {
+  const d = date || new Date().toISOString().slice(0, 10);
+  return apiGet("/bookingApi/getStaffTasks", { withAuth: true, query: { date: d } });
 }
 
 export async function verifyCarKey(bookingId, key, id) {
@@ -683,7 +516,7 @@ export async function verifyStaffOtp(email, otp) {
 }
 
 export async function staffLogin(email, password) {
-  return apiPost("/staff/login", { email, password });
+  return apiPost("/user/userloginnn", { email, password });
 }
 
 export async function getStaffDashboard() {
@@ -695,13 +528,46 @@ export async function verifyBooking(bookingId, action) {
 }
 
 export async function collectRemainingPayment(data) {
-  return apiPost("/payment/collect-remaining", data, { withAuth: true });
+  return apiPost("/bookingApi/collectPayment", data, { withAuth: true });
 }
 
 // ── Branch Head Dashboard ──────────────────────────────────
 export async function getBranchDashboardStats(branchId) {
   if (!branchId) return {};
   return apiGet(`/roleauth/branch_dashboard/${branchId}`, { withAuth: true });
+}
+
+export async function getBranchDashboardStatsWithDate(branchId, month) {
+  if (!branchId) return {};
+  try {
+    return await apiGet(`/roleauth/branch_dashboard/${branchId}`, {
+      withAuth: true,
+      query: { month }
+    });
+  } catch (error) {
+    return { 
+      totalBookings: 0, 
+      completedBookings: 0, 
+      cancelledBookings: 0, 
+      onRoadToday: 0, 
+      totalCars: 0, 
+      idleCars: 0 
+    };
+  }
+}
+
+export async function getBranchBookingsByDate(branchId, date) {
+  if (!branchId) return { data: [] };
+  try {
+    const response = await apiGet("/bookingApi/getBranchBookingsByDate", {
+      withAuth: true,
+      query: { branchId, date }
+    });
+    return response;
+  } catch (error) {
+    console.error("Failed to get branch bookings:", error);
+    return { data: [] };
+  }
 }
 
 export async function getBranchHeadProfile() {
@@ -711,11 +577,6 @@ export async function getBranchHeadProfile() {
 export async function getBranchCars(branchId, query = {}) {
   if (!branchId) return [];
   return apiGet(`/roleauth/branch_cars/${branchId}`, { withAuth: true, query });
-}
-
-export async function getBranchBookings(statusFilter = "all") {
-  const query = statusFilter && statusFilter !== "all" ? { status: statusFilter } : {};
-  return apiGet("/branch/bookings", { withAuth: true, query });
 }
 
 export async function getBranchStaff(branchId) {
@@ -757,8 +618,8 @@ export async function getOwnerPendingBreakdown(ownerId, branchId) {
   return apiGet(`/roleauth/getOwnerPendingBreakdown/${ownerId}`, { withAuth: true, query: { branchId } });
 }
 
-export async function markOwnerPaid(ownerId, branchId) {
-  return apiPut(`/roleauth/mark-owner-paid/${ownerId}`, { branchId }, { withAuth: true });
+export async function markOwnerPaid(ownerId, branchId, bookingIds = [], deductionAmount = 0, reason = "") {
+  return apiPost(`/roleauth/processOwnerPayout`, { ownerId, branchId, bookingIds, deductionAmount, reason }, { withAuth: true });
 }
 
 export async function updateBranch(branchId, data) {
@@ -783,39 +644,40 @@ export function calculatePrice(hours, pricing) {
   if (!pricing || !pricing.six_hr_price || !pricing.twelve_hr_price || !pricing.twentyfour_hr_price) {
     return 0;
   }
-
   let remaining = hours;
   let totalPrice = 0;
-
   const days = Math.floor(remaining / 24);
   totalPrice += days * pricing.twentyfour_hr_price;
   remaining -= days * 24;
-
   const halfDays = Math.floor(remaining / 12);
   totalPrice += halfDays * pricing.twelve_hr_price;
   remaining -= halfDays * 12;
-
   const sixHrs = Math.floor(remaining / 6);
   totalPrice += sixHrs * pricing.six_hr_price;
+  return totalPrice;
+}
 
-  return totalPrice; // NO PLATFORM FEE
+export async function updateBookingStatus(bookingId, status) {
+  try {
+    const response = await apiPut(`/branch/booking/${bookingId}/status`, { status }, { withAuth: true });
+    return response;
+  } catch (error) {
+    console.error("Failed to update booking status:", error);
+    throw error;
+  }
 }
 
 export function calculateAdvanceAmount(totalHours) {
   let remaining = totalHours;
   let advance = 0;
-
   const days = Math.floor(remaining / 24);
   advance += days * 500;
   remaining -= days * 24;
-
   const halfDays = Math.floor(remaining / 12);
   advance += halfDays * 500;
   remaining -= halfDays * 12;
-
   const sixHrs = Math.floor(remaining / 6);
   advance += sixHrs * 400;
-
   return advance;
 }
 
@@ -869,149 +731,24 @@ export function getStatusText(status) {
   return texts[status] || status;
 }
 
-// Aliases for AdminDashboard compatibility
-// export const getOwners = getAdminOwners;
-// export const getBookings = getAdminBookings;
-// export const getPayments = getAdminPayments;
-// export const getBranchStaff = getBranchStaff;
-
 const api = {
-  // User Auth
-  userLogin,
-  userRegister,
-  verifyUserOtp,
-  resendUserOtp,
-  getUserData,
-  updateProfile,
-  forgotPassOtp,
-  forgotPassOtpVerify,
-  changePassword,
-  getDocuments,
-  
-  // Owner Auth
-  ownerRegister,
-  ownerLogin,
-  resendOwnerOtp,
-  getOwnerData,
-  getOwnerDashboardData,
-  getCarStats,
-  getOwnerCars,
-  getCarDetails,
-  getEarningsBreakdown,
-  getOwnerBookings,
-  getOwnerProfile,
-  updateOwnerProfile,
-  addCar,
-  updateCar,
-  
-  // Owner Approvals
-  getPendingOwners,
-  approveOwner,
-  
-  // Cars
-  getCars,
-  getCar,
-  getBranches,
-  getPendingCars,
-  approveCar,
-  rejectCar,
-  updateCarPricing,
-  deleteCar,
-  
-  // Admin Analytics
-  getAdminDashboardStats,
-  getAdminEarningsReport,
-  getAdminCarAnalytics,
-  getAdminOwnerAnalytics,
-  getAdminBranchPerformance,
-  getBranchRevenue,
-  getBranchIncome,
-  
-  // Admin Management
-  getUsers,
-  getManagementUsers,
-  getAdminCars,
-  getAdminBookings,
-  getAdminOwners,
-  getAdminStaff,
-  getAdminPayments,
-  updateUserStatus,
-  updateCarStatus,
-  updateBookingStatus,
-  deleteUser,
-  createStaff,
-  deleteStaff,
-  verifyStaffRegister,
-  getSettings,
-  updateSettings,
-  adminChangePassword,
-  
-  // Bookings
-  getMyBookings,
-  getMyCredits,
-  bookCar,
-  offlineBookCar,
-  verifyPayment,
-  cancelBooking,
-  checkAvailability,
-  getBookingDetails,
-  
-  // Staff
-  getStaffTasks,
-  verifyCarKey,
-  startRide,
-  endRide,
-  uploadOwnerDocument,
-  createManagement,
-  sendStaffOtp,
-  verifyStaffOtp,
-  staffLogin,
-  getStaffDashboard,
-  verifyBooking,
-  collectRemainingPayment,
-
-  // Branch Head
-  getBranchDashboardStats,
-  getBranchCars,
-  getBranchBookings,
-  getBranchStaff,
-  getBranchActivities,
-  verifyBookingStart,
-  verifyBookingEnd,
-  updateBranchBookingStatus,
-  getBranchHeadProfile,
-  
-  // Super Admin
-  getSuperAdminFinances,
-  getFinancialData,
-  getPaymentHistory,
-  getOwnerPendingBreakdown,
-  markOwnerPaid,
-  updateBranch,
-  getAllData,
-
-  // Reviews
-  addReview,
-  getCarReviews,
-  
-  // Utilities
-  calculatePrice,
-  calculateAdvanceAmount,
-  formatINR,
-  formatDate,
-  formatDateTime,
-  getStatusColor,
-  getStatusText,
-  
-  // Core API methods
-  apiGet,
-  apiPost,
-  apiPut,
-  apiDelete,
-  setToken,
-  getToken,
-  authHeaders,
-  decodeToken,
+  userLogin, userRegister, verifyUserOtp, resendUserOtp, getUserData, updateProfile,
+  forgotPassOtp, forgotPassOtpVerify, changePassword, getDocuments,
+  ownerRegister, ownerLogin, verifyOwnerOtp, resendOwnerOtp, getOwnerData, getOwnerDashboardData,
+  getCarStats, getOwnerCars, getCarDetails, getEarningsBreakdown, getOwnerBookings, getOwnerProfile,
+  updateOwnerProfile, addCar, updateCar, getPendingOwners, approveOwner,
+  getCars, getCar, getBranches, getPendingCars, approveCar, rejectCar, updateCarPricing, deleteCar,
+  getAdminDashboardStats, getBranchRevenue, getBranchIncome, adminChangePassword,
+  getUsers, getManagementUsers,
+  getMyBookings, getMyCredits, bookCar, offlineBookCar, verifyPayment, cancelBooking, checkAvailability,
+  getBookingDetails, getStaffTasks, verifyCarKey, startRide, endRide, uploadOwnerDocument, createManagement,
+  sendStaffOtp, verifyStaffOtp, staffLogin, getStaffDashboard, verifyBooking, collectRemainingPayment,
+  getBranchDashboardStats, getBranchDashboardStatsWithDate, getBranchBookingsByDate, getBranchHeadProfile,
+  getBranchCars, getBranchStaff, getBranchActivities, verifyBookingStart, verifyBookingEnd,
+  updateBranchBookingStatus, updateBookingStatus, getSuperAdminFinances, getFinancialData, getPaymentHistory,
+  getOwnerPendingBreakdown, markOwnerPaid, updateBranch, getAllData,
+  addReview, getCarReviews, calculatePrice, calculateAdvanceAmount, formatINR, formatDate, formatDateTime,
+  getStatusColor, getStatusText, apiGet, apiPost, apiPut, apiDelete, setToken, getToken, authHeaders, decodeToken,
 };
 
 export default api;

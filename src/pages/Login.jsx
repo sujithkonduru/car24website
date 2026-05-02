@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { apiPost } from "../api.js";
+import { apiPost, userLogin } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { decodeToken } from "../context/AuthContext.jsx";
 import "../Auth.css";
@@ -9,11 +9,12 @@ import logo from "../images/Car 24 logo (1).png";
 function roleRedirect(role) {
   switch (role) {
     case "owner":      return "/owner/dashboard";
-    case "staff":
-    case "subadmin":   return "/staff/dashboard";
-    case "admin":
-    case "superadmin": return "/admin/dashboard";
+    case "staff":      return "/staff/dashboard";
+    case "sub_admin":
+    case "subadmin":   return "/branch/dashboard";
     case "branch_head": return "/branch/dashboard";
+    case "admin":      return "/admin/dashboard";
+    case "superadmin": return "/superadmin/dashboard";
     default:           return "/dashboard";
   }
 }

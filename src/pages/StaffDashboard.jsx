@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getStaffTasks, verifyCarKey, startRide, endRide, collectRemainingPayment, getBookingDetails } from "../api.js";
+import { toastSuccess, toastError } from "../hooks/useToast.js";
 import { Search, Clock, TrendingUp, CheckCircle, Users, Calendar, Activity, Download, User, Wallet, CreditCard, IndianRupee, Smartphone, Banknote, Receipt, Printer, ChevronDown, ChevronUp } from 'lucide-react';
 import UserProfileModal from "../components/UserProfileModal.jsx";
 import { printBookingReceipt } from "../utils/receiptUtils.js";
@@ -126,7 +127,8 @@ export default function StaffDashboard() {
     setTasksError(null);
     setElapsedTimes({});
     try {
-      const rows = await getStaffTasks();
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = await getStaffTasks(today);
       console.log("Loaded staff tasks:", rows);
       
       let tasksData = Array.isArray(rows) ? rows : [];
@@ -353,72 +355,113 @@ export default function StaffDashboard() {
         bookingToken: verifyResult.bookingToken,
       });
       setStartResult(res);
+      toastSuccess("Ride started successfully!");
       loadTasks();
       setVerifyResult(null);
       setVerifyForm({ bookingId: "", key: "" });
       setStartForm({ odometer: "", fuelLevel: "", fastagBalance: "" });
     } catch (err) {
       setStartError(err.message || `Failed to start ride: ${err.status || 'Unknown error'}`);
+      toastError(err.message || "Failed to start ride");
     } finally {
       setStartLoading(false);
     }
   }
 
   // ── End Ride ──
-  async function handleEndRide(e) {
-    e.preventDefault();
-    setEndError(null);
-    setEndResult(null);
-    setEndLoading(true);
-    try {
-      const odometerNum = Number(endForm.odometer) || 0;
-      if (odometerNum <= 0) {
-        setEndError("Odometer reading must be greater than 0");
-        setEndLoading(false);
-        return;
-      }
-
-      const fastagBalanceNum = parseFloat(
-        endForm.fastagBalance?.toString().replace(/[₹,]/g, '') || '0'
-      );
-      if (isNaN(fastagBalanceNum) || fastagBalanceNum < 0) {
-        setEndError("Fastag balance must be 0 or positive number");
-        setEndLoading(false);
-        return;
-      }
-
-      if (!endForm.fuelLevel) {
-        setEndError("Please select fuel level");
-        setEndLoading(false);
-        return;
-      }
-
-      const res = await endRide(endForm.bookingId, {
-        odometer: odometerNum,
-        fuelLevel: endForm.fuelLevel,
-        fastagBalance: fastagBalanceNum,
-      });
-      setEndResult(res);
-
-      if (res.remainingAmount && res.remainingAmount > 0) {
-        setOfflinePaymentData({
-          bookingId: endForm.bookingId,
-          remainingAmount: res.remainingAmount,
-          bookingDetails: res.bookingDetails,
-          carDetails: res.carDetails,
-          rideData: res
-        });
-        setShowOfflinePaymentModal(true);
-      } else {
-        loadTasks();
-        setEndForm({ bookingId: "", odometer: "", fuelLevel: "", fastagBalance: "" });
-      }
-    } catch (err) {
-      setEndError(err.message || "Could not end ride");
-    } finally {
+ async function handleEndRide(e) {
+  e.preventDefault();
+  setEndError(null);
+  setEndResult(null);
+  setEndLoading(true);
+  try {
+    const odometerNum = Number(endForm.odometer) || 0;
+    if (odometerNum <= 0) {
+      setEndError("Odometer reading must be greater than 0");
       setEndLoading(false);
+      return;
     }
+
+    const fastagBalanceNum = parseFloat(
+      endForm.fastagBalance?.toString().replace(/[₹,]/g, '') || '0'
+    );
+    if (isNaN(fastagBalanceNum) || fastagBalanceNum < 0) {
+      setEndError("Fastag balance must be 0 or positive number");
+      setEndLoading(false);
+      return;
+    }
+
+    if (!endForm.fuelLevel) {
+      setEndError("Please select fuel level");
+      setEndLoading(false);
+      return;
+    }
+
+    // ✅ CRITICAL FIX: Get booking details to calculate ride_end_amount
+    let rideEndAmount = 0;
+    try {
+      const bookingDetails = await getBookingDetails(endForm.bookingId);
+      const totalAmount = Number(bookingDetails?.totalPrice || bookingDetails?.total_price || 0);
+      const advancePaid = Number(bookingDetails?.advance_paid || 0);
+      rideEndAmount = Math.max(0, totalAmount - advancePaid);
+      console.log(`Calculated ride_end_amount: ${rideEndAmount} (Total: ${totalAmount}, Advance: ${advancePaid})`);
+    } catch (err) {
+      console.error("Failed to get booking details:", err);
+      // Fallback: try to get from endForm or use 0
+      rideEndAmount = Number(endForm.ride_end_amount) || 0;
+    }
+
+    // ✅ Send ALL required parameters including ride_end_amount
+    const res = await endRide(endForm.bookingId, {
+      odometer: odometerNum,
+      fuelLevel: endForm.fuelLevel,
+      fastagBalance: fastagBalanceNum,
+      ride_end_amount: rideEndAmount  // ✅ REQUIRED by backend
+    });
+    
+    setEndResult(res);
+
+    // Backend returns: { message, data: { remaining_amount, totalPrice, advance_paid, ... } }
+    const rideData = res.data || res;
+    const pendingAmt = Number(
+      rideData.remaining_amount ?? rideData.remainingAmount ?? 0
+    );
+    const totalAmt = Number(
+      rideData.totalPrice ?? rideData.total_price ?? rideData.totalprice ?? 0
+    );
+    const advancePaidAmt = Number(
+      rideData.advance_paid ?? rideData.advancePaid ?? 0
+    );
+
+    if (pendingAmt > 0) {
+      toastError(`Pending Amount: ₹${pendingAmt.toLocaleString('en-IN')}`, { duration: 6000 });
+
+      setOfflinePaymentData({
+        bookingId: endForm.bookingId,
+        remainingAmount: pendingAmt,
+        totalAmount: totalAmt,
+        advancePaid: advancePaidAmt,
+        bookingDetails: {
+          total_amount: totalAmt,
+          advance_paid: advancePaidAmt,
+        },
+        carDetails: res.carDetails || null,
+        rideData: rideData
+      });
+      setShowOfflinePaymentModal(true);
+    } else {
+      toastSuccess(res.message || "Ride ended successfully!");
+      loadTasks();
+      setEndForm({ bookingId: "", odometer: "", fuelLevel: "", fastagBalance: "" });
+    }
+  } catch (err) {
+    console.error("End ride error:", err);
+    setEndError(err.message || "Could not end ride");
+    toastError(err.message || "Could not end ride");
+  } finally {
+    setEndLoading(false);
   }
+}
 
   // ── Handle Offline Payment ──
   async function handleOfflinePayment(e) {
@@ -441,7 +484,7 @@ export default function StaffDashboard() {
       const response = await collectRemainingPayment(paymentData);
 
       if (response.success) {
-        alert(`Payment of ${formatCurrency(offlinePaymentData.remainingAmount)} collected successfully via ${offlinePaymentForm.paymentMethod === 'cash' ? 'Cash' : 'UPI'}!`);
+        toastSuccess(`₹${formatCurrency(offlinePaymentData.remainingAmount)} collected via ${offlinePaymentForm.paymentMethod === 'cash' ? 'Cash' : 'UPI'}!`);
         
         await printReceipt({
           ...offlinePaymentData,
@@ -456,6 +499,7 @@ export default function StaffDashboard() {
         setEndForm({ bookingId: "", odometer: "", fuelLevel: "", fastagBalance: "" });
       } else {
         setPaymentError(response.message || "Payment recording failed");
+        toastError(response.message || "Payment recording failed");
       }
     } catch (err) {
       setPaymentError(err.message || "Could not record payment");
@@ -566,11 +610,12 @@ export default function StaffDashboard() {
           });
 
           if (verifyRes.success) {
-            alert("Payment collected successfully!");
+            toastSuccess("Payment collected successfully!");
             setShowPaymentModal(false);
             loadTasks();
           } else {
             setPaymentError("Payment verification failed");
+            toastError("Payment verification failed");
           }
         } catch (ve) {
           setPaymentError(ve.message || "Payment verification failed");

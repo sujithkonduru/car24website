@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { getBranchBookings, updateBookingStatus } from "../api.js";
+import { getBranchBookingsByDate, updateBookingStatus } from "../api.js";
 import { formatINR, formatDateTime } from "../utils/formatters.js";
 import { Search, RefreshCw, AlertCircle, Calendar, Car, User, MapPin, TrendingUp, CheckCircle, XCircle, Eye, Key } from 'lucide-react';
 import "./BranchBooking.css";
@@ -11,26 +11,63 @@ export default function BranchBookings() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [branchId, setBranchId] = useState(null);
 
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+
+  // Get branch ID from token on mount
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem("car24_token");
+      if (token) {
+        const decoded = JSON.parse(atob(token.split(".")[1]));
+        const extractedBranchId = decoded?.branch_id || decoded?.branchId || decoded?.branch;
+        if (extractedBranchId) {
+          setBranchId(extractedBranchId);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to get branch ID:", error);
+    }
+  }, []);
 
   useEffect(() => {
-    loadBookings();
-  }, [filter]);
+    if (branchId) {
+      loadBookings();
+    }
+  }, [filter, branchId, selectedDate]);
 
   const loadBookings = async () => {
+    if (!branchId) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await getBranchBookings(filter);
-      const data = res?.data || res;
-
-      if (!Array.isArray(data)) {
-        throw new Error("Invalid response from server");
+      const res = await getBranchBookingsByDate(branchId, selectedDate);
+      const data = Array.isArray(res?.data) ? res.data : [];
+      
+      // Apply status filter
+      let filteredData = data;
+      if (filter !== "all") {
+        filteredData = data.filter(b => b.system_status?.toLowerCase() === filter.toLowerCase());
       }
-
-      setBookings(data);
+      
+      // Transform to expected format
+      const transformedBookings = filteredData.map(b => ({
+        id: b.booking_id,
+        customer_name: b.customer_name,
+        customer_phone: b.customer_phone,
+        car_model: b.car_model,
+        license_plate: b.number_plate,
+        pickup_date: b.pickupDate,
+        dropoff_date: b.dropoffDate,
+        total_price: b.totalPrice,
+        status: b.system_status,
+        live_status: b.live_status
+      }));
+      
+      setBookings(transformedBookings);
     } catch (err) {
       console.error(err);
       setError(err.message || "Failed to load bookings");
@@ -97,6 +134,20 @@ export default function BranchBookings() {
             <span className="role-badge">branch_head</span>
           </p>
         </div>
+      </div>
+
+      {/* Date Picker */}
+      <div className="date-picker-section">
+        <label>
+          <Calendar size={16} />
+          Select Date:
+        </label>
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="date-input"
+        />
       </div>
 
       {/* Stats Summary */}

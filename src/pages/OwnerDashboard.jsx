@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-import { getOwnerData, getOwnerCars } from "../api.js";
+import { getOwnerDashboardData, getOwnerCars } from "../api.js";
 import { carImageUrl } from "../utils/carImage.js";
 import "./OwnerDashboard.css";
 
@@ -29,7 +29,7 @@ export default function OwnerDashboard() {
     setError(null);
     try {
       const [ownerRes, carsRes] = await Promise.all([
-        getOwnerData(),
+        getOwnerDashboardData(),
         getOwnerCars(),
       ]);
       setStats(ownerRes?.stats || null);
