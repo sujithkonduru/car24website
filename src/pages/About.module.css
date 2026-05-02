@@ -756,7 +756,7 @@
 .valueCard {
   background: white;
   border-radius: 28px;
-  padding: 48px 32px;
+  padding: 68px 42px;
   text-align: center;
   position: relative;
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -1306,7 +1306,7 @@
   .valuesGrid {
     grid-template-columns: 1fr;
     gap: 25px;
-    max-width: 500px;
+    max-width: 100px;
     margin: 0 auto;
   }
   

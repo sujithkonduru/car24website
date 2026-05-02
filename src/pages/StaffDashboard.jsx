@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getStaffTasks, verifyCarKey, startRide, endRide, collectRemainingPayment, getBookingDetails, getCarGpsLocation } from "../api.js";
 import { toastSuccess, toastError } from "../hooks/useToast.js";
-import { Search, Clock, TrendingUp, CheckCircle, Users, Calendar, Activity, Download, User, Wallet, CreditCard, IndianRupee, Smartphone, Banknote, Receipt, Printer, ChevronDown, ChevronUp, MapPin, Navigation, Target, AlertCircle, RefreshCw } from 'lucide-react';
-import UserProfileModal from "../components/UserProfileModal.jsx";
+import { Search, Clock, TrendingUp, CheckCircle, Users, Calendar, CreditCard, Smartphone, Banknote, ChevronDown, ChevronUp, MapPin, Navigation, AlertCircle, RefreshCw } from 'lucide-react';
 import { printBookingReceipt } from "../utils/receiptUtils.js";
 import "./StaffDashboard.css";
 
@@ -54,7 +53,7 @@ function calculateDuration(pickupDate, dropoffDate) {
   const end = new Date(dropoffDate);
   const diffMs = end - start;
   const diffHours = diffMs / (1000 * 60 * 60);
-  
+
   if (diffHours >= 24) {
     const days = Math.floor(diffHours / 24);
     const remainingHours = diffHours % 24;
@@ -64,143 +63,6 @@ function calculateDuration(pickupDate, dropoffDate) {
     return `${days}d`;
   }
   return `${Math.round(diffHours)}h`;
-}
-
-// GPS Location Modal Component
-function GpsLocationModal({ car, onClose }) {
-  const [location, setLocation] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const fetchLocation = async (showRefresh = false) => {
-    if (showRefresh) setRefreshing(true);
-    else setLoading(true);
-    
-    try {
-      const response = await getCarGpsLocation(car.id);
-      console.log("GPS Response:", response);
-      
-      if (response.success && response.location) {
-        setLocation(response.location);
-        setError(null);
-      } else {
-        setError(response.message || "Location not available");
-      }
-    } catch (err) {
-      console.error("GPS fetch error:", err);
-      setError(err.message || "Failed to fetch location");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchLocation();
-  }, [car.id]);
-
-  const openGoogleMaps = () => {
-    if (location?.latitude && location?.longitude) {
-      const url = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
-      window.open(url, '_blank');
-    }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content gps-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>
-            <MapPin size={20} />
-            Live Location - {car.model}
-          </h2>
-          <button className="close-btn" onClick={onClose}>×</button>
-        </div>
-        
-        <div className="modal-body">
-          <div className="car-info-section">
-            <div className="car-detail">
-              <span className="label">Model:</span>
-              <span className="value">{car.model}</span>
-            </div>
-            <div className="car-detail">
-              <span className="label">License Plate:</span>
-              <span className="value">{car.license_plate || car.licensePlate || "—"}</span>
-            </div>
-          </div>
-
-          {loading && !refreshing && (
-            <div className="loading-state">
-              <div className="spinner"></div>
-              <p>Fetching live location...</p>
-            </div>
-          )}
-
-          {error && (
-            <div className="error-state">
-              <AlertCircle size={32} />
-              <p>{error}</p>
-              <button className="btn small" onClick={() => fetchLocation()}>Retry</button>
-            </div>
-          )}
-
-          {location && !loading && (
-            <div className="location-info">
-              <div className="location-details">
-                <div className="coord-row">
-                  <span className="label">📍 Latitude:</span>
-                  <span className="value">{location.latitude}</span>
-                </div>
-                <div className="coord-row">
-                  <span className="label">📍 Longitude:</span>
-                  <span className="value">{location.longitude}</span>
-                </div>
-                {location.speed !== undefined && (
-                  <div className="coord-row">
-                    <span className="label">💨 Speed:</span>
-                    <span className="value">{location.speed} km/h</span>
-                  </div>
-                )}
-                {location.ignition !== undefined && (
-                  <div className="coord-row">
-                    <span className="label">🔑 Ignition:</span>
-                    <span className={`value ${location.ignition ? 'active' : 'inactive'}`}>
-                      {location.ignition ? 'ON' : 'OFF'}
-                    </span>
-                  </div>
-                )}
-                {location.time && (
-                  <div className="coord-row">
-                    <span className="label">🕐 Last Update:</span>
-                    <span className="value">{formatDt(location.time)}</span>
-                  </div>
-                )}
-              </div>
-              
-              <div className="map-preview">
-                <div className="map-placeholder">
-                  <Navigation size={48} />
-                  <p>Lat: {location.latitude}, Lng: {location.longitude}</p>
-                </div>
-              </div>
-
-              <div className="action-buttons">
-                <button className="btn primary" onClick={openGoogleMaps}>
-                  <MapPin size={16} />
-                  Open in Google Maps
-                </button>
-                <button className="btn ghost" onClick={() => fetchLocation(true)} disabled={refreshing}>
-                  <RefreshCw size={16} className={refreshing ? "spinning" : ""} />
-                  {refreshing ? "Refreshing..." : "Refresh"}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default function StaffDashboard() {
@@ -252,7 +114,7 @@ export default function StaffDashboard() {
   // Filter and search state
   const [bookingFilter, setBookingFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Expanded rows for user details
   const [expandedUsers, setExpandedUsers] = useState({});
 
@@ -270,9 +132,9 @@ export default function StaffDashboard() {
       const today = new Date().toISOString().slice(0, 10);
       const rows = await getStaffTasks(today);
       console.log("Loaded staff tasks:", rows);
-      
+
       let tasksData = Array.isArray(rows) ? rows : [];
-      
+
       if (tasksData.length > 0) {
         console.log("Fetching booking details for pricing information...");
         const enrichedTasks = await Promise.all(
@@ -280,7 +142,7 @@ export default function StaffDashboard() {
             try {
               const bookingDetails = await getBookingDetails(task.booking_id);
               console.log(`Booking ${task.booking_id} details:`, bookingDetails);
-              
+
               return {
                 ...task,
                 totalPrice: bookingDetails.totalPrice || bookingDetails.total_price || 0,
@@ -312,7 +174,7 @@ export default function StaffDashboard() {
         );
         tasksData = enrichedTasks;
       }
-      
+
       setTasks(tasksData);
     } catch (e) {
       console.error("Load tasks error:", e);
@@ -365,7 +227,7 @@ export default function StaffDashboard() {
       const totalAmount = getTotalAmount(task);
       const advancePaid = getAdvancePaid(task);
       const remaining = getRemainingAmount(task);
-      
+
       grouped[customerKey].bookings.push({
         ...task,
         totalAmount,
@@ -379,18 +241,6 @@ export default function StaffDashboard() {
     });
     return Object.values(grouped);
   }, [tasks]);
-
-  const totalAmount = useMemo(() => 
-    tasks.reduce((sum, t) => sum + getTotalAmount(t), 0)
-  , [tasks]);
-
-  const advancePaid = useMemo(() => 
-    tasks.reduce((sum, t) => sum + getAdvancePaid(t), 0)
-  , [tasks]);
-
-  const pendingCollection = useMemo(() => 
-    tasks.reduce((sum, t) => sum + Math.max(0, getRemainingAmount(t)), 0)
-  , [tasks]);
 
   const individualStats = useMemo(() => {
     return groupedByCustomer.map(customer => ({
@@ -432,20 +282,20 @@ export default function StaffDashboard() {
     setVerifyLoading(true);
     try {
       const booking = tasks.find(t => t.booking_id === parseInt(verifyForm.bookingId));
-      
+
       if (!booking) {
         throw new Error("Booking not found in tasks");
       }
-      
+
       const customerUserId = booking.userId || booking.user_id;
-      
+
       if (!customerUserId) {
         throw new Error("Customer user ID not found for this booking");
       }
-      
+
       const res = await verifyCarKey(
-        verifyForm.bookingId, 
-        verifyForm.key, 
+        verifyForm.bookingId,
+        verifyForm.key,
         customerUserId
       );
       setVerifyResult(res);
@@ -553,7 +403,7 @@ export default function StaffDashboard() {
         fastagBalance: fastagBalanceNum,
         ride_end_amount: rideEndAmount
       });
-      
+
       setEndResult(res);
 
       const rideData = res.data || res;
@@ -618,13 +468,13 @@ export default function StaffDashboard() {
 
       if (response.success) {
         toastSuccess(`₹${formatCurrency(offlinePaymentData.remainingAmount)} collected via ${offlinePaymentForm.paymentMethod === 'cash' ? 'Cash' : 'UPI'}!`);
-        
+
         await printReceipt({
           ...offlinePaymentData,
           paymentMethod: offlinePaymentForm.paymentMethod,
           transactionId: paymentDataObj.transactionId
         });
-        
+
         setShowOfflinePaymentModal(false);
         setOfflinePaymentForm({ paymentMethod: "cash", transactionId: "", remarks: "" });
         setOfflinePaymentData(null);
@@ -772,6 +622,173 @@ export default function StaffDashboard() {
   function prefillVerify(bookingId) {
     setVerifyForm((f) => ({ ...f, bookingId: String(bookingId) }));
     setActiveTab("verify");
+  }
+
+  // GPS Location Modal Component defined inside StaffDashboard
+  function GpsLocationModal({ car, onClose }) {
+    const [location, setLocation] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const parseLocationResponse = (resp) => {
+      if (!resp) return null;
+      const payload = resp.data ?? resp;
+      if (payload.success && payload.location) return payload.location;
+      if (payload.latitude !== undefined && payload.longitude !== undefined) return payload;
+      if (payload.lat !== undefined && (payload.lng !== undefined || payload.lon !== undefined)) {
+        return { latitude: payload.lat, longitude: payload.lng ?? payload.lon, ...payload };
+      }
+      if (payload.location && payload.location.latitude !== undefined) return payload.location;
+      if (payload.gps && payload.gps.latitude !== undefined) return payload.gps;
+      if (Array.isArray(payload) && payload.length > 0 && payload[0].latitude !== undefined) return payload[0];
+      
+      const findCoords = (obj) => {
+        if (!obj || typeof obj !== "object") return null;
+        if (obj.latitude !== undefined && obj.longitude !== undefined) return { latitude: obj.latitude, longitude: obj.longitude, ...obj };
+        if (obj.lat !== undefined && (obj.lng !== undefined || obj.lon !== undefined)) return { latitude: obj.lat, longitude: obj.lng ?? obj.lon, ...obj };
+        for (const k of Object.keys(obj)) {
+          if (typeof obj[k] === "object") {
+            const res = findCoords(obj[k]);
+            if (res) return res;
+          }
+        }
+        return null;
+      };
+      return findCoords(payload);
+    };
+
+    const fetchLocation = async (showRefresh = false) => {
+      if (showRefresh) setRefreshing(true);
+      else setLoading(true);
+      setError(null);
+      try {
+        const response = await getCarGpsLocation(car.id);
+        console.log("GPS Response:", response);
+        const loc = parseLocationResponse(response);
+        if (loc && loc.latitude != null && loc.longitude != null) {
+          setLocation(loc);
+          setError(null);
+        } else {
+          setLocation(null);
+          setError(response?.message || "Location not available");
+        }
+      } catch (err) {
+        console.error("GPS fetch error:", err);
+        setLocation(null);
+        setError(err?.message || "Failed to fetch location");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    };
+
+    useEffect(() => {
+      let interval = null;
+      fetchLocation();
+      interval = setInterval(() => {
+        fetchLocation(true);
+      }, 10000);
+      return () => {
+        if (interval) clearInterval(interval);
+      };
+    }, [car.id]);
+
+    const openGoogleMaps = () => {
+      if (location?.latitude && location?.longitude) {
+        const url = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
+        window.open(url, "_blank");
+      }
+    };
+
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-content gps-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h2>
+              <MapPin size={20} />
+              Live Location - {car.model}
+            </h2>
+            <button className="close-btn" onClick={onClose}>×</button>
+          </div>
+          <div className="modal-body">
+            <div className="car-info-section">
+              <div className="car-detail">
+                <span className="label">Model:</span>
+                <span className="value">{car.model}</span>
+              </div>
+              <div className="car-detail">
+                <span className="label">License Plate:</span>
+                <span className="value">{car.license_plate || car.licensePlate || "—"}</span>
+              </div>
+            </div>
+            {loading && !refreshing && (
+              <div className="loading-state">
+                <div className="spinner"></div>
+                <p>Fetching live location...</p>
+              </div>
+            )}
+            {error && (
+              <div className="error-state">
+                <AlertCircle size={32} />
+                <p>{error}</p>
+                <button className="btn small" onClick={() => fetchLocation()}>Retry</button>
+              </div>
+            )}
+            {location && !loading && (
+              <div className="location-info">
+                <div className="location-details">
+                  <div className="coord-row">
+                    <span className="label">📍 Latitude:</span>
+                    <span className="value">{location.latitude}</span>
+                  </div>
+                  <div className="coord-row">
+                    <span className="label">📍 Longitude:</span>
+                    <span className="value">{location.longitude}</span>
+                  </div>
+                  {location.speed !== undefined && (
+                    <div className="coord-row">
+                      <span className="label">💨 Speed:</span>
+                      <span className="value">{location.speed} km/h</span>
+                    </div>
+                  )}
+                  {location.ignition !== undefined && (
+                    <div className="coord-row">
+                      <span className="label">🔑 Ignition:</span>
+                      <span className={`value ${location.ignition ? "active" : "inactive"}`}>
+                        {location.ignition ? "ON" : "OFF"}
+                      </span>
+                    </div>
+                  )}
+                  {location.time && (
+                    <div className="coord-row">
+                      <span className="label">🕐 Last Update:</span>
+                      <span className="value">{formatDt(location.time)}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="map-preview">
+                  <div className="map-placeholder">
+                    <Navigation size={48} />
+                    <p>Lat: {location.latitude}, Lng: {location.longitude}</p>
+                  </div>
+                </div>
+                <div className="action-buttons">
+                  <button className="btn primary" onClick={openGoogleMaps}>
+                    <MapPin size={16} />
+                    Open in Google Maps
+                  </button>
+                  <button className="btn ghost" onClick={() => fetchLocation(true)} disabled={refreshing}>
+                    <RefreshCw size={16} className={refreshing ? "spinning" : ""} />
+                    {refreshing ? "Refreshing..." : "Refresh"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -941,7 +958,7 @@ export default function StaffDashboard() {
           ) : (
             <div className="customer-accordion">
               {groupedByCustomer
-                .filter(customer => 
+                .filter(customer =>
                   customer.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   customer.customerPhone.includes(searchTerm)
                 )
@@ -976,7 +993,7 @@ export default function StaffDashboard() {
                         {expandedUsers[customer.customerName] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                       </div>
                     </div>
-                    
+
                     {expandedUsers[customer.customerName] && (
                       <div className="customer-accordion-content">
                         <div className="bookings-list">
@@ -1023,6 +1040,26 @@ export default function StaffDashboard() {
                                       </span>
                                     </td>
                                     <td className="actions-cell">
+                                      {booking.car_id && (
+                                        <button
+                                          className="track-car-btn"
+                                          onClick={() => handleTrackCar(booking.car_id, booking.carDisplay, booking.car_plate)}
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "4px",
+                                            padding: "4px 8px",
+                                            background: "#3b82f6",
+                                            color: "white",
+                                            border: "none",
+                                            borderRadius: "4px",
+                                            cursor: "pointer",
+                                            fontSize: "12px"
+                                          }}
+                                        >
+                                          <MapPin size={14} /> Track
+                                        </button>
+                                      )}
                                       {status === "pending" && (
                                         <button
                                           className="btn-small primary"
@@ -1032,21 +1069,12 @@ export default function StaffDashboard() {
                                         </button>
                                       )}
                                       {status === "active" && (
-                                        <>
-                                          <button
-                                            className="btn-small secondary"
-                                            onClick={() => handleTrackCar(booking.car_id, booking.carDisplay, booking.car_plate)}
-                                            title="Track Live Location"
-                                          >
-                                            <MapPin size={14} /> Track
-                                          </button>
-                                          <button
-                                            className="btn-small danger"
-                                            onClick={() => prefillEndRide(booking.booking_id, booking)}
-                                          >
-                                            End Ride
-                                          </button>
-                                        </>
+                                        <button
+                                          className="btn-small danger"
+                                          onClick={() => prefillEndRide(booking.booking_id, booking)}
+                                        >
+                                          End Ride
+                                        </button>
                                       )}
                                     </td>
                                   </tr>
@@ -1164,18 +1192,18 @@ export default function StaffDashboard() {
                             </span>
                           </td>
                           <td className="sdb-actions">
+                            {task.car_id && (
+                              <button
+                                className="sdb-btn-small secondary"
+                                onClick={() => handleTrackCar(task.car_id, task.car_model, task.car_plate)}
+                                style={{ background: "#3b82f620", color: "#3b82f6", marginRight: "8px" }}
+                              >
+                                <MapPin size={14} /> Track
+                              </button>
+                            )}
                             <button className="sdb-btn-small primary" onClick={() => prefillVerify(task.booking_id)}>Verify</button>
-                            {status === "active" && task.car_id && (
-                              <>
-                                <button 
-                                  className="sdb-btn-small secondary" 
-                                  onClick={() => handleTrackCar(task.car_id, task.car_model, task.car_plate)}
-                                  style={{ background: "#3b82f620", color: "#3b82f6" }}
-                                >
-                                  <MapPin size={14} /> Track
-                                </button>
-                                <button className="sdb-btn-small danger" onClick={() => prefillEndRide(task.booking_id, task)}>End Ride</button>
-                              </>
+                            {status === "active" && (
+                              <button className="sdb-btn-small danger" onClick={() => prefillEndRide(task.booking_id, task)}>End Ride</button>
                             )}
                           </td>
                         </tr>
@@ -1192,7 +1220,7 @@ export default function StaffDashboard() {
       {activeTab === "tasks" && (
         <div className="sdb-panel">
           {tasksError && <p className="banner error">{tasksError}</p>}
-          {tasksLoading && <div className="sdb-skeleton-list">{[1,2,3].map(i => <div key={i} className="sdb-skeleton-row" />)}</div>}
+          {tasksLoading && <div className="sdb-skeleton-list">{[1, 2, 3].map(i => <div key={i} className="sdb-skeleton-row" />)}</div>}
 
           {!tasksLoading && (
             <>
@@ -1228,6 +1256,15 @@ export default function StaffDashboard() {
                             {remainingAmount > 0 && <div className="payment-note"><span>⚠️ Customer needs to pay {formatCurrency(remainingAmount)} at pickup</span></div>}
                           </div>
                           <div className="sdb-task-actions">
+                            {t.car_id && (
+                              <button
+                                className="btn small secondary track-btn"
+                                onClick={() => handleTrackCar(t.car_id, t.car_model, t.car_plate)}
+                                style={{ marginRight: "8px" }}
+                              >
+                                <MapPin size={14} /> Track Live
+                              </button>
+                            )}
                             <button className="btn small primary" onClick={() => prefillVerify(t.booking_id)}>Verify Key &amp; Start</button>
                           </div>
                         </div>
@@ -1255,7 +1292,7 @@ export default function StaffDashboard() {
                             </div>
                             <div className="sdb-action-buttons">
                               {t.car_id && (
-                                <button 
+                                <button
                                   className="btn small secondary track-btn"
                                   onClick={() => handleTrackCar(t.car_id, t.car_model, t.car_plate)}
                                   style={{ marginRight: "8px" }}
@@ -1303,8 +1340,8 @@ export default function StaffDashboard() {
             <section className="card">
               <h2 className="sdb-card-title">Verify Customer Key</h2>
               <form className="sdb-form" onSubmit={handleVerify}>
-                <label>Booking ID<input type="text" value={verifyForm.bookingId} onChange={(e) => setVerifyForm(f => ({...f, bookingId: e.target.value}))} placeholder="e.g. 42" required/></label>
-                <label>Confirmation OTP / Key<input type="text" value={verifyForm.key} onChange={(e) => setVerifyForm(f => ({...f, key: e.target.value}))} placeholder="6-digit OTP" required/></label>
+                <label>Booking ID<input type="text" value={verifyForm.bookingId} onChange={(e) => setVerifyForm(f => ({ ...f, bookingId: e.target.value }))} placeholder="e.g. 42" required /></label>
+                <label>Confirmation OTP / Key<input type="text" value={verifyForm.key} onChange={(e) => setVerifyForm(f => ({ ...f, key: e.target.value }))} placeholder="6-digit OTP" required /></label>
                 {verifyError && <p className="banner error">{verifyError}</p>}
                 <button type="submit" className="btn primary" disabled={verifyLoading}>{verifyLoading ? "Verifying…" : "Verify Key"}</button>
               </form>
@@ -1330,9 +1367,16 @@ export default function StaffDashboard() {
               <h2 className="sdb-card-title">Start Ride</h2>
               {!verifyResult?.bookingToken ? <p className="muted sdb-hint">Verify a customer key first to enable ride start.</p> : (
                 <form className="sdb-form" onSubmit={handleStartRide}>
-                  <label>Odometer Reading (km) <span className="required">*</span><input type="number" step="0.1" value={startForm.odometer} onChange={(e) => setStartForm(f => ({...f, odometer: e.target.value}))} placeholder="e.g. 24000.5" required/></label>
-                  <label>Fuel Level <span className="required">*</span><select value={startForm.fuelLevel} onChange={(e) => setStartForm(f => ({...f, fuelLevel: e.target.value}))} required><option value="">Select level</option><option value="Full">Full</option><option value="3/4">3/4</option><option value="1/2">1/2</option><option value="1/4">1/4</option><option value="Empty">Empty</option></select></label>
-                  <label>Fastag Balance <span className="required">*</span><input type="text" value={startForm.fastagBalance} onChange={(e) => setStartForm(f => ({...f, fastagBalance: e.target.value}))} placeholder="e.g. ₹250 or 250" required/></label>
+                  <label>Odometer Reading (km) <span className="required">*</span><input type="number" step="0.1" value={startForm.odometer} onChange={(e) => setStartForm(f => ({ ...f, odometer: e.target.value }))} placeholder="e.g. 24000.5" required /></label>
+                  <label>Fuel Level <span className="required">*</span><select value={startForm.fuelLevel} onChange={(e) => setStartForm(f => ({ ...f, fuelLevel: e.target.value }))} required>
+                    <option value="">Select level</option>
+                    <option value="Full">Full</option>
+                    <option value="3/4">3/4</option>
+                    <option value="1/2">1/2</option>
+                    <option value="1/4">1/4</option>
+                    <option value="Empty">Empty</option>
+                  </select></label>
+                  <label>Fastag Balance <span className="required">*</span><input type="text" value={startForm.fastagBalance} onChange={(e) => setStartForm(f => ({ ...f, fastagBalance: e.target.value }))} placeholder="e.g. ₹250 or 250" required /></label>
                   {startError && <p className="banner error">{startError}</p>}
                   {startResult && <p className="banner success">✓ Ride started successfully!</p>}
                   <button type="submit" className="btn primary" disabled={startLoading || !!startResult}>{startLoading ? "Starting…" : startResult ? "Started ✓" : "Start Ride"}</button>
@@ -1344,10 +1388,17 @@ export default function StaffDashboard() {
             <section className="card">
               <h2 className="sdb-card-title">End Ride</h2>
               <form className="sdb-form" onSubmit={handleEndRide}>
-                <label>Booking ID<input type="text" value={endForm.bookingId} onChange={(e) => setEndForm(f => ({...f, bookingId: e.target.value}))} placeholder="e.g. 42" required/></label>
-                <label>Odometer Reading (km) <span className="required">*</span><input type="number" step="0.1" value={endForm.odometer} onChange={(e) => setEndForm(f => ({...f, odometer: e.target.value}))} placeholder="e.g. 24350.2" required/></label>
-                <label>Fuel Level <span className="required">*</span><select value={endForm.fuelLevel} onChange={(e) => setEndForm(f => ({...f, fuelLevel: e.target.value}))} required><option value="">Select level</option><option value="Full">Full</option><option value="3/4">3/4</option><option value="1/2">1/2</option><option value="1/4">1/4</option><option value="Empty">Empty</option></select></label>
-                <label>Fastag Balance <span className="required">*</span><input type="text" value={endForm.fastagBalance} onChange={(e) => setEndForm(f => ({...f, fastagBalance: e.target.value}))} placeholder="e.g. ₹180 or 180" required/></label>
+                <label>Booking ID<input type="text" value={endForm.bookingId} onChange={(e) => setEndForm(f => ({ ...f, bookingId: e.target.value }))} placeholder="e.g. 42" required /></label>
+                <label>Odometer Reading (km) <span className="required">*</span><input type="number" step="0.1" value={endForm.odometer} onChange={(e) => setEndForm(f => ({ ...f, odometer: e.target.value }))} placeholder="e.g. 24350.2" required /></label>
+                <label>Fuel Level <span className="required">*</span><select value={endForm.fuelLevel} onChange={(e) => setEndForm(f => ({ ...f, fuelLevel: e.target.value }))} required>
+                  <option value="">Select level</option>
+                  <option value="Full">Full</option>
+                  <option value="3/4">3/4</option>
+                  <option value="1/2">1/2</option>
+                  <option value="1/4">1/4</option>
+                  <option value="Empty">Empty</option>
+                </select></label>
+                <label>Fastag Balance <span className="required">*</span><input type="text" value={endForm.fastagBalance} onChange={(e) => setEndForm(f => ({ ...f, fastagBalance: e.target.value }))} placeholder="e.g. ₹180 or 180" required /></label>
                 {endError && <p className="banner error">{endError}</p>}
                 {endResult && <p className="banner success">✓ {endResult.message || "Ride ended successfully"}</p>}
                 <button type="submit" className="btn danger" disabled={endLoading}>{endLoading ? "Ending…" : "End Ride"}</button>
@@ -1401,12 +1452,12 @@ export default function StaffDashboard() {
                   <h3>Payment Method</h3>
                   <div className="method-options">
                     <label className={`method-option ${offlinePaymentForm.paymentMethod === 'cash' ? 'selected' : ''}`}>
-                      <input type="radio" name="paymentMethod" value="cash" checked={offlinePaymentForm.paymentMethod === 'cash'} onChange={(e) => setOfflinePaymentForm({...offlinePaymentForm, paymentMethod: e.target.value})} />
+                      <input type="radio" name="paymentMethod" value="cash" checked={offlinePaymentForm.paymentMethod === 'cash'} onChange={(e) => setOfflinePaymentForm({ ...offlinePaymentForm, paymentMethod: e.target.value })} />
                       <Banknote size={20} />
                       <span>Cash</span>
                     </label>
                     <label className={`method-option ${offlinePaymentForm.paymentMethod === 'upi' ? 'selected' : ''}`}>
-                      <input type="radio" name="paymentMethod" value="upi" checked={offlinePaymentForm.paymentMethod === 'upi'} onChange={(e) => setOfflinePaymentForm({...offlinePaymentForm, paymentMethod: e.target.value})} />
+                      <input type="radio" name="paymentMethod" value="upi" checked={offlinePaymentForm.paymentMethod === 'upi'} onChange={(e) => setOfflinePaymentForm({ ...offlinePaymentForm, paymentMethod: e.target.value })} />
                       <Smartphone size={20} />
                       <span>UPI (Offline)</span>
                     </label>
@@ -1416,14 +1467,14 @@ export default function StaffDashboard() {
                 {offlinePaymentForm.paymentMethod === 'upi' && (
                   <div className="form-group">
                     <label>Transaction ID / UTR Number</label>
-                    <input type="text" value={offlinePaymentForm.transactionId} onChange={(e) => setOfflinePaymentForm({...offlinePaymentForm, transactionId: e.target.value})} placeholder="Enter UPI transaction ID" required />
+                    <input type="text" value={offlinePaymentForm.transactionId} onChange={(e) => setOfflinePaymentForm({ ...offlinePaymentForm, transactionId: e.target.value })} placeholder="Enter UPI transaction ID" required />
                     <small>Optional but recommended for tracking</small>
                   </div>
                 )}
 
                 <div className="form-group">
                   <label>Remarks (Optional)</label>
-                  <textarea rows="2" value={offlinePaymentForm.remarks} onChange={(e) => setOfflinePaymentForm({...offlinePaymentForm, remarks: e.target.value})} placeholder="Any notes about this payment..." />
+                  <textarea rows="2" value={offlinePaymentForm.remarks} onChange={(e) => setOfflinePaymentForm({ ...offlinePaymentForm, remarks: e.target.value })} placeholder="Any notes about this payment..." />
                 </div>
 
                 {paymentError && <div className="payment-error"><p>{paymentError}</p></div>}

@@ -10,7 +10,7 @@
   --bg-primary: #0a0a0a;
   --bg-secondary: #121212;
   --bg-card: #1a1a1a;
-  --bg-hover: #242424;
+  --bg-hover: #61d5ffb9;
   
   /* Text Colors */
   --text-primary: #ffffff;
@@ -214,12 +214,12 @@
 }
 
 .hp-search-input {
-  background: var(--bg-secondary);
+  background: var(--bg-hover);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 10px 12px;
   font-size: 14px;
-  color: var(--text-primary);
+  color: rgba(186, 237, 251, 0.863);
   transition: all var(--transition-fast);
 }
 
