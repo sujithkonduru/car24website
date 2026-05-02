@@ -199,7 +199,7 @@ export default function MyBookings() {
                     
                     {/* Show track button for ongoing/active bookings */}
                     {["confirmed", "ongoing", "active"].includes(b.status?.toLowerCase()) && (
-                      <Link to={`/tracking/${b.id}`} className="mb-btn-ghost">
+                      <Link to={`/carGps/${car.id}`} className="mb-btn-ghost">
                         📍 Track
                       </Link>
                     )}

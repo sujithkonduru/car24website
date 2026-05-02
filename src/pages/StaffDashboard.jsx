@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { getStaffTasks, verifyCarKey, startRide, endRide, collectRemainingPayment, getBookingDetails } from "../api.js";
+import { getStaffTasks, verifyCarKey, startRide, endRide, collectRemainingPayment, getBookingDetails, getCarGpsLocation } from "../api.js";
 import { toastSuccess, toastError } from "../hooks/useToast.js";
-import { Search, Clock, TrendingUp, CheckCircle, Users, Calendar, Activity, Download, User, Wallet, CreditCard, IndianRupee, Smartphone, Banknote, Receipt, Printer, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Clock, TrendingUp, CheckCircle, Users, Calendar, Activity, Download, User, Wallet, CreditCard, IndianRupee, Smartphone, Banknote, Receipt, Printer, ChevronDown, ChevronUp, MapPin, Navigation, Target, AlertCircle, RefreshCw } from 'lucide-react';
 import UserProfileModal from "../components/UserProfileModal.jsx";
 import { printBookingReceipt } from "../utils/receiptUtils.js";
 import "./StaffDashboard.css";
@@ -48,7 +48,6 @@ function formatElapsed(isoString) {
   }
 }
 
-// Function to calculate rental duration
 function calculateDuration(pickupDate, dropoffDate) {
   if (!pickupDate || !dropoffDate) return "—";
   const start = new Date(pickupDate);
@@ -67,6 +66,143 @@ function calculateDuration(pickupDate, dropoffDate) {
   return `${Math.round(diffHours)}h`;
 }
 
+// GPS Location Modal Component
+function GpsLocationModal({ car, onClose }) {
+  const [location, setLocation] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchLocation = async (showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
+    else setLoading(true);
+    
+    try {
+      const response = await getCarGpsLocation(car.id);
+      console.log("GPS Response:", response);
+      
+      if (response.success && response.location) {
+        setLocation(response.location);
+        setError(null);
+      } else {
+        setError(response.message || "Location not available");
+      }
+    } catch (err) {
+      console.error("GPS fetch error:", err);
+      setError(err.message || "Failed to fetch location");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLocation();
+  }, [car.id]);
+
+  const openGoogleMaps = () => {
+    if (location?.latitude && location?.longitude) {
+      const url = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`;
+      window.open(url, '_blank');
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content gps-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>
+            <MapPin size={20} />
+            Live Location - {car.model}
+          </h2>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        
+        <div className="modal-body">
+          <div className="car-info-section">
+            <div className="car-detail">
+              <span className="label">Model:</span>
+              <span className="value">{car.model}</span>
+            </div>
+            <div className="car-detail">
+              <span className="label">License Plate:</span>
+              <span className="value">{car.license_plate || car.licensePlate || "—"}</span>
+            </div>
+          </div>
+
+          {loading && !refreshing && (
+            <div className="loading-state">
+              <div className="spinner"></div>
+              <p>Fetching live location...</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="error-state">
+              <AlertCircle size={32} />
+              <p>{error}</p>
+              <button className="btn small" onClick={() => fetchLocation()}>Retry</button>
+            </div>
+          )}
+
+          {location && !loading && (
+            <div className="location-info">
+              <div className="location-details">
+                <div className="coord-row">
+                  <span className="label">📍 Latitude:</span>
+                  <span className="value">{location.latitude}</span>
+                </div>
+                <div className="coord-row">
+                  <span className="label">📍 Longitude:</span>
+                  <span className="value">{location.longitude}</span>
+                </div>
+                {location.speed !== undefined && (
+                  <div className="coord-row">
+                    <span className="label">💨 Speed:</span>
+                    <span className="value">{location.speed} km/h</span>
+                  </div>
+                )}
+                {location.ignition !== undefined && (
+                  <div className="coord-row">
+                    <span className="label">🔑 Ignition:</span>
+                    <span className={`value ${location.ignition ? 'active' : 'inactive'}`}>
+                      {location.ignition ? 'ON' : 'OFF'}
+                    </span>
+                  </div>
+                )}
+                {location.time && (
+                  <div className="coord-row">
+                    <span className="label">🕐 Last Update:</span>
+                    <span className="value">{formatDt(location.time)}</span>
+                  </div>
+                )}
+              </div>
+              
+              <div className="map-preview">
+                <div className="map-placeholder">
+                  <Navigation size={48} />
+                  <p>Lat: {location.latitude}, Lng: {location.longitude}</p>
+                </div>
+              </div>
+
+              <div className="action-buttons">
+                <button className="btn primary" onClick={openGoogleMaps}>
+                  <MapPin size={16} />
+                  Open in Google Maps
+                </button>
+                <button className="btn ghost" onClick={() => fetchLocation(true)} disabled={refreshing}>
+                  <RefreshCw size={16} className={refreshing ? "spinning" : ""} />
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function StaffDashboard() {
   const { user, isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
@@ -75,6 +211,10 @@ export default function StaffDashboard() {
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState(null);
+
+  // GPS tracking state
+  const [selectedCar, setSelectedCar] = useState(null);
+  const [showGpsModal, setShowGpsModal] = useState(false);
 
   // Key verify state
   const [verifyForm, setVerifyForm] = useState({ bookingId: "", key: "" });
@@ -133,7 +273,6 @@ export default function StaffDashboard() {
       
       let tasksData = Array.isArray(rows) ? rows : [];
       
-      // Fetch complete booking details for each task to get pricing information
       if (tasksData.length > 0) {
         console.log("Fetching booking details for pricing information...");
         const enrichedTasks = await Promise.all(
@@ -149,13 +288,14 @@ export default function StaffDashboard() {
                 remaining_amount: bookingDetails.remaining_amount || (bookingDetails.totalPrice - bookingDetails.advance_paid) || 0,
                 pickupDate: bookingDetails.pickupDate || task.pickupDate,
                 dropoffDate: bookingDetails.dropoffDate || task.dropoffDate,
-                customer_name: bookingDetails.user?.name || task.customer_name,
-                customer_phone: bookingDetails.user?.mobileNo || task.customer_phone,
-                customer_email: bookingDetails.user?.email || task.customer_email,
-                car_model: bookingDetails.car?.model || task.car_model,
-                car_plate: bookingDetails.car?.licensePlate || task.car_plate,
-                car_brand: bookingDetails.car?.brand || task.car_brand,
-                duration: calculateDuration(bookingDetails.pickupDate, bookingDetails.dropoffDate),
+                customer_name: bookingDetails.customer_name || task.customer_name,
+                customer_phone: bookingDetails.customer_phone || task.customer_phone,
+                customer_email: bookingDetails.customer_email || task.customer_email,
+                car_model: bookingDetails.car_model || task.car_model,
+                car_plate: bookingDetails.car_plate || task.car_plate,
+                car_brand: bookingDetails.car_brand || task.car_brand,
+                car_id: bookingDetails.car_id || task.car_id,
+                duration: calculateDuration(bookingDetails.pickupDate || task.pickupDate, bookingDetails.dropoffDate || task.dropoffDate),
                 rentalType: bookingDetails.rentalType || task.rentalType || "daily"
               };
             } catch (err) {
@@ -200,7 +340,12 @@ export default function StaffDashboard() {
     return getTotalAmount(task) - getAdvancePaid(task);
   };
 
-  // Group tasks by customer for individual user view
+  const handleTrackCar = (carId, carModel, carPlate) => {
+    setSelectedCar({ id: carId, model: carModel, license_plate: carPlate });
+    setShowGpsModal(true);
+  };
+
+  // Group tasks by customer
   const groupedByCustomer = useMemo(() => {
     const grouped = {};
     tasks.forEach(task => {
@@ -235,7 +380,6 @@ export default function StaffDashboard() {
     return Object.values(grouped);
   }, [tasks]);
 
-  // Overall totals
   const totalAmount = useMemo(() => 
     tasks.reduce((sum, t) => sum + getTotalAmount(t), 0)
   , [tasks]);
@@ -248,7 +392,6 @@ export default function StaffDashboard() {
     tasks.reduce((sum, t) => sum + Math.max(0, getRemainingAmount(t)), 0)
   , [tasks]);
 
-  // Individual stats for overview cards
   const individualStats = useMemo(() => {
     return groupedByCustomer.map(customer => ({
       name: customer.customerName,
@@ -260,7 +403,6 @@ export default function StaffDashboard() {
     }));
   }, [groupedByCustomer]);
 
-  // Toggle expand for user details
   const toggleUserExpand = (customerName) => {
     setExpandedUsers(prev => ({
       ...prev,
@@ -268,7 +410,6 @@ export default function StaffDashboard() {
     }));
   };
 
-  // Live timer updates
   useEffect(() => {
     const interval = setInterval(() => {
       const newElapsed = {};
@@ -283,7 +424,6 @@ export default function StaffDashboard() {
     return () => clearInterval(interval);
   }, [activeRides]);
 
-  // ── Verify Key ──
   async function handleVerify(e) {
     e.preventDefault();
     setVerifyError(null);
@@ -316,7 +456,6 @@ export default function StaffDashboard() {
     }
   }
 
-  // ── Start Ride ──
   async function handleStartRide(e) {
     e.preventDefault();
     if (!verifyResult?.bookingToken) {
@@ -368,109 +507,103 @@ export default function StaffDashboard() {
     }
   }
 
-  // ── End Ride ──
- async function handleEndRide(e) {
-  e.preventDefault();
-  setEndError(null);
-  setEndResult(null);
-  setEndLoading(true);
-  try {
-    const odometerNum = Number(endForm.odometer) || 0;
-    if (odometerNum <= 0) {
-      setEndError("Odometer reading must be greater than 0");
-      setEndLoading(false);
-      return;
-    }
-
-    const fastagBalanceNum = parseFloat(
-      endForm.fastagBalance?.toString().replace(/[₹,]/g, '') || '0'
-    );
-    if (isNaN(fastagBalanceNum) || fastagBalanceNum < 0) {
-      setEndError("Fastag balance must be 0 or positive number");
-      setEndLoading(false);
-      return;
-    }
-
-    if (!endForm.fuelLevel) {
-      setEndError("Please select fuel level");
-      setEndLoading(false);
-      return;
-    }
-
-    // ✅ CRITICAL FIX: Get booking details to calculate ride_end_amount
-    let rideEndAmount = 0;
+  async function handleEndRide(e) {
+    e.preventDefault();
+    setEndError(null);
+    setEndResult(null);
+    setEndLoading(true);
     try {
-      const bookingDetails = await getBookingDetails(endForm.bookingId);
-      const totalAmount = Number(bookingDetails?.totalPrice || bookingDetails?.total_price || 0);
-      const advancePaid = Number(bookingDetails?.advance_paid || 0);
-      rideEndAmount = Math.max(0, totalAmount - advancePaid);
-      console.log(`Calculated ride_end_amount: ${rideEndAmount} (Total: ${totalAmount}, Advance: ${advancePaid})`);
-    } catch (err) {
-      console.error("Failed to get booking details:", err);
-      // Fallback: try to get from endForm or use 0
-      rideEndAmount = Number(endForm.ride_end_amount) || 0;
-    }
+      const odometerNum = Number(endForm.odometer) || 0;
+      if (odometerNum <= 0) {
+        setEndError("Odometer reading must be greater than 0");
+        setEndLoading(false);
+        return;
+      }
 
-    // ✅ Send ALL required parameters including ride_end_amount
-    const res = await endRide(endForm.bookingId, {
-      odometer: odometerNum,
-      fuelLevel: endForm.fuelLevel,
-      fastagBalance: fastagBalanceNum,
-      ride_end_amount: rideEndAmount  // ✅ REQUIRED by backend
-    });
-    
-    setEndResult(res);
+      const fastagBalanceNum = parseFloat(
+        endForm.fastagBalance?.toString().replace(/[₹,]/g, '') || '0'
+      );
+      if (isNaN(fastagBalanceNum) || fastagBalanceNum < 0) {
+        setEndError("Fastag balance must be 0 or positive number");
+        setEndLoading(false);
+        return;
+      }
 
-    // Backend returns: { message, data: { remaining_amount, totalPrice, advance_paid, ... } }
-    const rideData = res.data || res;
-    const pendingAmt = Number(
-      rideData.remaining_amount ?? rideData.remainingAmount ?? 0
-    );
-    const totalAmt = Number(
-      rideData.totalPrice ?? rideData.total_price ?? rideData.totalprice ?? 0
-    );
-    const advancePaidAmt = Number(
-      rideData.advance_paid ?? rideData.advancePaid ?? 0
-    );
+      if (!endForm.fuelLevel) {
+        setEndError("Please select fuel level");
+        setEndLoading(false);
+        return;
+      }
 
-    if (pendingAmt > 0) {
-      toastError(`Pending Amount: ₹${pendingAmt.toLocaleString('en-IN')}`, { duration: 6000 });
+      let rideEndAmount = 0;
+      try {
+        const bookingDetails = await getBookingDetails(endForm.bookingId);
+        const totalAmount = Number(bookingDetails?.totalPrice || bookingDetails?.total_price || 0);
+        const advancePaid = Number(bookingDetails?.advance_paid || 0);
+        rideEndAmount = Math.max(0, totalAmount - advancePaid);
+        console.log(`Calculated ride_end_amount: ${rideEndAmount} (Total: ${totalAmount}, Advance: ${advancePaid})`);
+      } catch (err) {
+        console.error("Failed to get booking details:", err);
+        rideEndAmount = Number(endForm.ride_end_amount) || 0;
+      }
 
-      setOfflinePaymentData({
-        bookingId: endForm.bookingId,
-        remainingAmount: pendingAmt,
-        totalAmount: totalAmt,
-        advancePaid: advancePaidAmt,
-        bookingDetails: {
-          total_amount: totalAmt,
-          advance_paid: advancePaidAmt,
-        },
-        carDetails: res.carDetails || null,
-        rideData: rideData
+      const res = await endRide(endForm.bookingId, {
+        odometer: odometerNum,
+        fuelLevel: endForm.fuelLevel,
+        fastagBalance: fastagBalanceNum,
+        ride_end_amount: rideEndAmount
       });
-      setShowOfflinePaymentModal(true);
-    } else {
-      toastSuccess(res.message || "Ride ended successfully!");
-      loadTasks();
-      setEndForm({ bookingId: "", odometer: "", fuelLevel: "", fastagBalance: "" });
-    }
-  } catch (err) {
-    console.error("End ride error:", err);
-    setEndError(err.message || "Could not end ride");
-    toastError(err.message || "Could not end ride");
-  } finally {
-    setEndLoading(false);
-  }
-}
+      
+      setEndResult(res);
 
-  // ── Handle Offline Payment ──
+      const rideData = res.data || res;
+      const pendingAmt = Number(
+        rideData.remaining_amount ?? rideData.remainingAmount ?? 0
+      );
+      const totalAmt = Number(
+        rideData.totalPrice ?? rideData.total_price ?? rideData.totalprice ?? 0
+      );
+      const advancePaidAmt = Number(
+        rideData.advance_paid ?? rideData.advancePaid ?? 0
+      );
+
+      if (pendingAmt > 0) {
+        toastError(`Pending Amount: ₹${pendingAmt.toLocaleString('en-IN')}`, { duration: 6000 });
+
+        setOfflinePaymentData({
+          bookingId: endForm.bookingId,
+          remainingAmount: pendingAmt,
+          totalAmount: totalAmt,
+          advancePaid: advancePaidAmt,
+          bookingDetails: {
+            total_amount: totalAmt,
+            advance_paid: advancePaidAmt,
+          },
+          carDetails: res.carDetails || null,
+          rideData: rideData
+        });
+        setShowOfflinePaymentModal(true);
+      } else {
+        toastSuccess(res.message || "Ride ended successfully!");
+        loadTasks();
+        setEndForm({ bookingId: "", odometer: "", fuelLevel: "", fastagBalance: "" });
+      }
+    } catch (err) {
+      console.error("End ride error:", err);
+      setEndError(err.message || "Could not end ride");
+      toastError(err.message || "Could not end ride");
+    } finally {
+      setEndLoading(false);
+    }
+  }
+
   async function handleOfflinePayment(e) {
     e.preventDefault();
     setPaymentLoading(true);
     setPaymentError(null);
 
     try {
-      const paymentData = {
+      const paymentDataObj = {
         bookingId: offlinePaymentData.bookingId,
         amount: offlinePaymentData.remainingAmount,
         paymentMethod: offlinePaymentForm.paymentMethod,
@@ -481,7 +614,7 @@ export default function StaffDashboard() {
         collectedAt: new Date().toISOString()
       };
 
-      const response = await collectRemainingPayment(paymentData);
+      const response = await collectRemainingPayment(paymentDataObj);
 
       if (response.success) {
         toastSuccess(`₹${formatCurrency(offlinePaymentData.remainingAmount)} collected via ${offlinePaymentForm.paymentMethod === 'cash' ? 'Cash' : 'UPI'}!`);
@@ -489,7 +622,7 @@ export default function StaffDashboard() {
         await printReceipt({
           ...offlinePaymentData,
           paymentMethod: offlinePaymentForm.paymentMethod,
-          transactionId: paymentData.transactionId
+          transactionId: paymentDataObj.transactionId
         });
         
         setShowOfflinePaymentModal(false);
@@ -508,7 +641,6 @@ export default function StaffDashboard() {
     }
   }
 
-  // ── Print Receipt ──
   async function printReceipt(paymentInfo) {
     setPrintingReceipt(true);
     try {
@@ -539,7 +671,6 @@ export default function StaffDashboard() {
     }
   }
 
-  // ── Handle Online Payment (Legacy) ──
   function openRazorpay(order, bookingId, onVerified) {
     if (!window.Razorpay) {
       setPaymentError("Razorpay script not loaded. Refresh the page.");
@@ -692,14 +823,13 @@ export default function StaffDashboard() {
           )}
         </button>
         <button className={`sdb-tab${activeTab === "verify" ? " active" : ""}`} onClick={() => setActiveTab("verify")}>
-          Key Verify &amp; Ride Control
+          Key Verify & Ride Control
         </button>
       </div>
 
-      {/* Overview Tab - Individual User Stats */}
+      {/* Overview Tab */}
       {activeTab === "overview" && (
         <div className="sdb-panel">
-          {/* Summary Stats Grid */}
           <div className="sdb-stats-grid">
             <div className="sdb-stat-card">
               <div className="sdb-stat-icon" style={{ background: "#fbbf2420", color: "#fbbf24" }}>
@@ -739,7 +869,6 @@ export default function StaffDashboard() {
             </div>
           </div>
 
-          {/* Individual Customer Summary Cards */}
           <div className="sdb-section">
             <h2 className="sdb-section-title">Customer Payment Summary</h2>
             <div className="customer-summary-grid">
@@ -776,7 +905,6 @@ export default function StaffDashboard() {
             </div>
           </div>
 
-          {/* Offline Payment Instructions Banner */}
           <div className="offline-instructions-banner">
             <div className="banner-icon">💡</div>
             <div className="banner-content">
@@ -787,7 +915,7 @@ export default function StaffDashboard() {
         </div>
       )}
 
-      {/* Customers Tab - Detailed Individual View */}
+      {/* Customers Tab */}
       {activeTab === "customers" && (
         <div className="sdb-panel">
           <div className="sdb-section-header">
@@ -845,11 +973,7 @@ export default function StaffDashboard() {
                           <span className="stat-label">Remaining</span>
                           <span className="stat-value">{formatCurrency(customer.totalRemaining)}</span>
                         </div>
-                        {expandedUsers[customer.customerName] ? (
-                          <ChevronUp size={20} />
-                        ) : (
-                          <ChevronDown size={20} />
-                        )}
+                        {expandedUsers[customer.customerName] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                       </div>
                     </div>
                     
@@ -870,7 +994,7 @@ export default function StaffDashboard() {
                                 <th>Advance Paid</th>
                                 <th>Remaining</th>
                                 <th>Status</th>
-                                <th>Action</th>
+                                <th>Actions</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -898,7 +1022,7 @@ export default function StaffDashboard() {
                                         {status.charAt(0).toUpperCase() + status.slice(1)}
                                       </span>
                                     </td>
-                                    <td>
+                                    <td className="actions-cell">
                                       {status === "pending" && (
                                         <button
                                           className="btn-small primary"
@@ -908,12 +1032,21 @@ export default function StaffDashboard() {
                                         </button>
                                       )}
                                       {status === "active" && (
-                                        <button
-                                          className="btn-small danger"
-                                          onClick={() => prefillEndRide(booking.booking_id, booking)}
-                                        >
-                                          End Ride
-                                        </button>
+                                        <>
+                                          <button
+                                            className="btn-small secondary"
+                                            onClick={() => handleTrackCar(booking.car_id, booking.carDisplay, booking.car_plate)}
+                                            title="Track Live Location"
+                                          >
+                                            <MapPin size={14} /> Track
+                                          </button>
+                                          <button
+                                            className="btn-small danger"
+                                            onClick={() => prefillEndRide(booking.booking_id, booking)}
+                                          >
+                                            End Ride
+                                          </button>
+                                        </>
                                       )}
                                     </td>
                                   </tr>
@@ -1032,8 +1165,17 @@ export default function StaffDashboard() {
                           </td>
                           <td className="sdb-actions">
                             <button className="sdb-btn-small primary" onClick={() => prefillVerify(task.booking_id)}>Verify</button>
-                            {status === "active" && (
-                              <button className="sdb-btn-small danger" onClick={() => prefillEndRide(task.booking_id, task)}>End Ride</button>
+                            {status === "active" && task.car_id && (
+                              <>
+                                <button 
+                                  className="sdb-btn-small secondary" 
+                                  onClick={() => handleTrackCar(task.car_id, task.car_model, task.car_plate)}
+                                  style={{ background: "#3b82f620", color: "#3b82f6" }}
+                                >
+                                  <MapPin size={14} /> Track
+                                </button>
+                                <button className="sdb-btn-small danger" onClick={() => prefillEndRide(task.booking_id, task)}>End Ride</button>
+                              </>
                             )}
                           </td>
                         </tr>
@@ -1111,7 +1253,18 @@ export default function StaffDashboard() {
                               <p className="sdb-task-plate">{t.car_plate}</p>
                               <p className="sdb-task-duration">📅 {t.duration || calculateDuration(t.pickupDate, t.dropoffDate)}</p>
                             </div>
-                            <span className="sdb-status-pill sdb-status-pill--active">Ongoing</span>
+                            <div className="sdb-action-buttons">
+                              {t.car_id && (
+                                <button 
+                                  className="btn small secondary track-btn"
+                                  onClick={() => handleTrackCar(t.car_id, t.car_model, t.car_plate)}
+                                  style={{ marginRight: "8px" }}
+                                >
+                                  <MapPin size={14} /> Track Live
+                                </button>
+                              )}
+                              <span className="sdb-status-pill sdb-status-pill--active">Ongoing</span>
+                            </div>
                           </div>
                           <div className="sdb-task-meta">
                             <span>👤 {t.customer_name}</span>
@@ -1146,6 +1299,7 @@ export default function StaffDashboard() {
       {activeTab === "verify" && (
         <div className="sdb-panel sdb-verify-panel">
           <div className="sdb-verify-grid">
+            {/* Verify section */}
             <section className="card">
               <h2 className="sdb-card-title">Verify Customer Key</h2>
               <form className="sdb-form" onSubmit={handleVerify}>
@@ -1158,12 +1312,20 @@ export default function StaffDashboard() {
                 <div className="sdb-verify-result">
                   <p className="banner success">✓ Key verified successfully</p>
                   {verifyResult.userdata && (
-                    <div className="sdb-customer-info"><h3>Customer Details</h3><dl className="sdb-dl"><div><dt>Name</dt><dd>{verifyResult.userdata.name}</dd></div><div><dt>Email</dt><dd>{verifyResult.userdata.email}</dd></div><div><dt>Mobile</dt><dd>{verifyResult.userdata.mobileno || "—"}</dd></div></dl></div>
+                    <div className="sdb-customer-info">
+                      <h3>Customer Details</h3>
+                      <dl className="sdb-dl">
+                        <div><dt>Name</dt><dd>{verifyResult.userdata.name}</dd></div>
+                        <div><dt>Email</dt><dd>{verifyResult.userdata.email}</dd></div>
+                        <div><dt>Mobile</dt><dd>{verifyResult.userdata.mobileno || "—"}</dd></div>
+                      </dl>
+                    </div>
                   )}
                 </div>
               )}
             </section>
 
+            {/* Start Ride section */}
             <section className="card">
               <h2 className="sdb-card-title">Start Ride</h2>
               {!verifyResult?.bookingToken ? <p className="muted sdb-hint">Verify a customer key first to enable ride start.</p> : (
@@ -1178,6 +1340,7 @@ export default function StaffDashboard() {
               )}
             </section>
 
+            {/* End Ride section */}
             <section className="card">
               <h2 className="sdb-card-title">End Ride</h2>
               <form className="sdb-form" onSubmit={handleEndRide}>
@@ -1194,7 +1357,12 @@ export default function StaffDashboard() {
         </div>
       )}
 
-      {/* Offline Payment Collection Modal */}
+      {/* GPS Location Modal */}
+      {showGpsModal && selectedCar && (
+        <GpsLocationModal car={selectedCar} onClose={() => setShowGpsModal(false)} />
+      )}
+
+      {/* Offline Payment Modal */}
       {showOfflinePaymentModal && offlinePaymentData && (
         <div className="payment-modal-overlay">
           <div className="payment-modal offline-modal">
@@ -1202,7 +1370,6 @@ export default function StaffDashboard() {
               <h2>Collect Payment</h2>
               <button className="close-btn" onClick={() => setShowOfflinePaymentModal(false)}>×</button>
             </div>
-
             <div className="payment-modal-content">
               <div className="offline-badge">
                 <span className="badge offline">Offline Collection</span>
@@ -1283,7 +1450,7 @@ export default function StaffDashboard() {
         </div>
       )}
 
-      {/* Online Payment Modal (Legacy) */}
+      {/* Online Payment Modal */}
       {showPaymentModal && paymentData && (
         <div className="payment-modal-overlay">
           <div className="payment-modal">

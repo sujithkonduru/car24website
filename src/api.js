@@ -226,6 +226,16 @@ export async function getOwnerData() {
   return apiGet("/owners/getOwnerData", { withAuth: true });
 }
 
+// Add to api.js
+export async function getCarGpsLocation(carId) {
+  try {
+    const response = await apiGet(`/carGps/${carId}`, { withAuth: true });
+    return response;
+  } catch (error) {
+    console.error("Failed to get car GPS location:", error);
+    throw error;
+  }
+}
 export async function getOwnerDashboardData() {
   const emptyStats = {
     total_bookings: 0, total_earnings: 0, total_deductions: 0,
