@@ -323,7 +323,7 @@ export default function Layout({ children }) {
             </a>
             <a href={`tel:${PHONE}`} className="lyt-footer-contact-item">
               <span className="lyt-fci-icon lyt-fci-ph"><PhoneIcon /></span>
-              <span>+62 817-0466-64</span>
+              <span>+91 9703040505</span>
             </a>
           </div>
 
