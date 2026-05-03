@@ -36,6 +36,49 @@
   display: block;
 }
 
+.cc-book-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 16px;
+  border-radius: 8px;
+
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+
+  transition: all 0.3s ease;
+}
+
+.cc-book-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+
+.cc-book-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.9;
+  transition: transform 0.4s ease;
+}
+
+.cc-book-arrow {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.3s ease;
+}
+
+/* Animations */
+.cc-book-btn:hover .cc-book-arrow {
+  transform: translateX(5px);
+}
+
+.cc-book-btn:hover .cc-book-icon {
+  transform: rotate(90deg);
+}
+
 .cc-root:hover .cc-img {
   transform: scale(1.06);
 }
@@ -280,6 +323,24 @@
   background: linear-gradient(90deg, transparent, var(--accent, #14b8a6), transparent);
   opacity: 0;
   transition: opacity 0.3s;
+}
+
+.cc-wishlist-btn {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgb(233 174 174);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition);
+    z-index: 3;
 }
 
 .cc-root:hover .cc-glow-line {

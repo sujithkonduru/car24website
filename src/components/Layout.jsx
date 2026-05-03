@@ -4,9 +4,9 @@ import { useAuth } from "../context/AuthContext.jsx";
 import "../Layout.css";
 import logo from "../images/Car 24 logo (1).png";
 
-const WHATSAPP = "6281704664";
+const WHATSAPP = "#";
 const INSTAGRAM = "#";
-const PHONE = "6281704664";
+const PHONE = "9703040505";
 
 const ROLE_LABEL = {
   user: "User", owner: "Owner", staff: "Staff",

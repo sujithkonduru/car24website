@@ -301,11 +301,28 @@ export default function CarCard({
           </div>
 
           <Link to={`/car/${car.id}`} className="cc-book-btn">
-            <span>Book Now</span>
-            <svg className="cc-book-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          </Link>
+  
+  {/* Steering Wheel SVG */}
+  <svg
+    className="cc-book-icon"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <circle cx="10" cy="10" r="9" />
+    <path d="M12 3v6M3 12h6M21 12h-6M12 21v-6" />
+    <circle cx="12" cy="12" r="2" />
+  </svg>
+
+  <span>View Now</span>
+
+  {/* Arrow */}
+  <svg className="cc-book-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M5 12h14M12 5l7 7-7 7" />
+  </svg>
+
+</Link>
         </div>
       </div>
 
