@@ -108,25 +108,25 @@ export default function Home() {
     catch { setBranches([]); }
   }, []);
 
-  const loadCars = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const q = {
-        limit: 12, pageno: page,
-        category: activeCategory !== "All" ? activeCategory : undefined,
-        fuelType: filters.fuelType || undefined,
-        transmission: filters.transmission || undefined,
-        seater: filters.seater || undefined,
-        model: filters.model || undefined,
-        colour: filters.colour || undefined,
-        branch: filters.branch || undefined,
-        pickupDate: filters.pickupDate ? new Date(filters.pickupDate).toISOString() : undefined,
-        dropoffDate: filters.dropoffDate ? new Date(filters.dropoffDate).toISOString() : undefined,
-      };
-      setPayload(await apiGet("/cars/get_cars", { query: q }));
-    } catch (e) { setError(e.message || "Could not load cars"); setPayload(null); }
-    finally { setLoading(false); }
-  }, [filters, page, activeCategory]);
+  // const loadCars = useCallback(async () => {
+  //   setLoading(true); setError(null);
+  //   try {
+  //     const q = {
+  //       limit: 12, pageno: page,
+  //       category: activeCategory !== "All" ? activeCategory : undefined,
+  //       fuelType: filters.fuelType || undefined,
+  //       transmission: filters.transmission || undefined,
+  //       seater: filters.seater || undefined,
+  //       model: filters.model || undefined,
+  //       colour: filters.colour || undefined,
+  //       branch: filters.branch || undefined,
+  //       pickupDate: filters.pickupDate ? new Date(filters.pickupDate).toISOString() : undefined,
+  //       dropoffDate: filters.dropoffDate ? new Date(filters.dropoffDate).toISOString() : undefined,
+  //     };
+  //     setPayload(await apiGet("/cars/get_cars", { query: q }));
+  //   } catch (e) { setError(e.message || "Could not load cars"); setPayload(null); }
+  //   finally { setLoading(false); }
+  // }, [filters, page, activeCategory]);
 
   useEffect(() => { loadBranches(); }, [loadBranches]);
   useEffect(() => { loadCars(); }, [loadCars]);
