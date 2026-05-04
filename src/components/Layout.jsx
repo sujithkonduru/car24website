@@ -319,7 +319,7 @@ export default function Layout({ children }) {
             </a>
             <a href={INSTAGRAM} target="_blank" rel="noopener noreferrer" className="lyt-footer-contact-item">
               <span className="lyt-fci-icon lyt-fci-ig"><InstagramIcon /></span>
-              <span>@cars24india</span>
+              <span>@car24india</span>
             </a>
             <a href={`tel:${PHONE}`} className="lyt-footer-contact-item">
               <span className="lyt-fci-icon lyt-fci-ph"><PhoneIcon /></span>

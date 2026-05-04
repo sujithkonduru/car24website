@@ -100,9 +100,9 @@ const Contact = () => {
     {
       icon: Phone,
       title: "Call Us",
-      info: "+91 98765 43210",
+      info: "+91 9703040505",
       detail: "24/7 Customer Support",
-      link: "tel:+919876543210",
+      link: "#",
       color: "#3b82f6"
     },
     {
