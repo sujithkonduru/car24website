@@ -58,7 +58,7 @@ body { font-family: var(--font-body); background: var(--bg); color: var(--text);
 /* Brand */
 .lyt-brand { display: flex; align-items: center; text-decoration: none; flex-shrink: 0; transition: opacity 0.2s; }
 .lyt-brand:hover { opacity: 0.85; }
-.lyt-brand-img { height: 42px; width: auto; object-fit: contain; }
+.lyt-brand-img { height: 52px; width: auto; object-fit: contain; }
 
 /* Center Nav Links */
 .lyt-nav-links { display: flex; align-items: center; gap: 0.125rem; }

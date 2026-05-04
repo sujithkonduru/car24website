@@ -108,7 +108,7 @@ const Contact = () => {
     {
       icon: MapPin,
       title: "Visit Us",
-      info: "Hyderabad, India",
+      info: "Nellore, India",
       detail: "Multiple branches across India",
       link: "#",
       color: "#f59e0b"

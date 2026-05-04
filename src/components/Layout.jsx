@@ -5,7 +5,7 @@ import "../Layout.css";
 import logo from "../images/Car 24 logo (1).png";
 
 const WHATSAPP = "#";
-const INSTAGRAM = "#";
+const INSTAGRAM = "https://www.instagram.com/car24_travels_official/";
 const PHONE = "9703040505";
 
 const ROLE_LABEL = {
@@ -15,11 +15,11 @@ const ROLE_LABEL = {
 };
 
 const NAV_LINKS = [
-  { to: "/", label: "Home", end: true },
+  // { to: "/", label: "Home", end: true },
   // { to: "/cars", label: "Cars" },
-  { to: "/bookings", label: "Bookings" },
-  { to: "/about", label: "About" },
-  { to: "/contact", label: "Contact" },
+  // { to: "/bookings", label: "Bookings" },
+  // { to: "/about", label: "About" },
+  // { to: "/contact", label: "Contact" },
 ];
 
 /* ── Icons ── */
