@@ -370,7 +370,7 @@ export default function TermsOfService() {
                 <p>Address: [registered address]</p>
               </div>
               <div className="legal-contact-links">
-                <a href="mailto:support@car24.com" className="legal-contact-link primary">Email Us</a>
+                <a href="mailto:Car24travel@gmail.com" className="legal-contact-link primary">Email Us</a>
                 <Link to="/contact" className="legal-contact-link ghost">Contact Page</Link>
               </div>
             </div>

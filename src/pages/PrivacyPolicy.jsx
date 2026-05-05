@@ -242,7 +242,7 @@ export default function PrivacyPolicy() {
               </div>
             </div>
             <p>Our platform is strictly restricted to individuals aged 18 and above who hold a valid driving license. We do not knowingly collect or process data from minors. If we become aware that a minor has provided us with personal data, we will delete it promptly.</p>
-            <p>If you believe a minor has registered on our platform, please contact us immediately at support@car24.in.</p>
+            <p>If you believe a minor has registered on our platform, please contact us immediately at Car24travel@gmail.com.</p>
           </div>
 
           <div className="legal-section" id="contact">
@@ -259,10 +259,10 @@ export default function PrivacyPolicy() {
             <div className="legal-contact-card">
               <div>
                 <p><strong>Car24 Privacy Team</strong></p>
-                <p>support@car24.in</p>
+                <p>Car24travel@gmail.com</p>
               </div>
               <div className="legal-contact-links">
-                <a href="mailto:support@car24.in" className="legal-contact-link primary">Email Us</a>
+                <a href="mailto:Car24travel@gmail.com" className="legal-contact-link primary">Email Us</a>
                 <Link to="/contact" className="legal-contact-link ghost">Contact Page</Link>
               </div>
             </div>

@@ -372,7 +372,7 @@ export function generateReceiptHTML(booking, type = "user") {
     <div class="receipt-footer">
       <div class="footer-note">
         This is a computer-generated receipt. No physical signature required.<br>
-        For support: support@car24.in &nbsp;|&nbsp; +91 628 170 4664
+        For support: Car24travel@gmail.com &nbsp;|&nbsp; +91 628 170 4664
       </div>
       <div class="footer-brand">Car24 India</div>
     </div>

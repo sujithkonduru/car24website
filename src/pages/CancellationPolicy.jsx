@@ -181,11 +181,11 @@ export default function CancellationPolicy() {
             <div className="legal-contact-card">
               <div>
                 <p><strong>Car24 Travels Support Team</strong></p>
-                <p>Email: support@car24.com</p>
+                <p>Email: Car24travel@gmail.com</p>
                 <p>Phone: [Your Support Number]</p>
               </div>
               <div className="legal-contact-links">
-                <a href="mailto:support@car24.com" className="legal-contact-link primary">Email Us</a>
+                <a href="mailto:Car24travel@gmail.com" className="legal-contact-link primary">Email Us</a>
                 <Link to="/contact" className="legal-contact-link ghost">Contact Page</Link>
               </div>
             </div>

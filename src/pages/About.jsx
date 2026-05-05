@@ -100,17 +100,17 @@ const About = () => {
           const targets = {
             cars: 500,
             customers: 25000,
-            cities: 100,
-            bookings: 50000
+            cities: 25,
+            bookings: 10000
           };
-          
+
           const increments = {
             cars: targets.cars / (duration / step),
             customers: targets.customers / (duration / step),
             cities: targets.cities / (duration / step),
             bookings: targets.bookings / (duration / step)
           };
-          
+
           let current = { cars: 0, customers: 0, cities: 0, bookings: 0 };
           const interval = setInterval(() => {
             current = {
@@ -120,8 +120,8 @@ const About = () => {
               bookings: Math.min(current.bookings + increments.bookings, targets.bookings)
             };
             setCounters(current);
-            if (current.cars >= targets.cars && current.customers >= targets.customers && 
-                current.cities >= targets.cities && current.bookings >= targets.bookings) {
+            if (current.cars >= targets.cars && current.customers >= targets.customers &&
+              current.cities >= targets.cities && current.bookings >= targets.bookings) {
               clearInterval(interval);
             }
           }, step);
@@ -129,7 +129,7 @@ const About = () => {
       },
       { threshold: 0.5 }
     );
-    
+
     if (statsRef.current) {
       observer.observe(statsRef.current);
     }
@@ -180,7 +180,7 @@ const About = () => {
   const STATS_DISPLAY = [
     { value: Math.floor(counters.cars), label: 'Car Models', icon: Car, suffix: '+' },
     { value: Math.floor(counters.customers), label: 'Happy Customers', icon: Users, suffix: '+' },
-    { value: Math.floor(counters.cities), label: 'Cities Covered', icon: MapPin, suffix: '+' },
+    { value: Math.floor(counters.cities), label: 'Cities Network', icon: MapPin, suffix: '+' },
     { value: Math.floor(counters.bookings), label: 'Bookings Completed', icon: Calendar, suffix: '+' }
   ];
 
@@ -225,7 +225,7 @@ const About = () => {
     {
       step: '03',
       title: 'Pick Up',
-      description: 'Receive the keys at your preferred location through our seamless and contactless pickup process.',
+      description: 'Collect your car keys from our branch at Nellore or Guntur. Our staff will assist you with a seamless and contactless pickup process.',
       icon: Key,
       color: '#f59e0b'
     },
@@ -464,7 +464,7 @@ const About = () => {
                 </div>
                 <h3>Our Mission</h3>
                 <p>
-                  We aim to make car rentals accessible, affordable, and hassle-free for everyone 
+                  We aim to make car rentals accessible, affordable, and hassle-free for everyone
                   by creating India's most trusted peer-to-peer car sharing marketplace.
                 </p>
               </motion.div>
@@ -481,7 +481,7 @@ const About = () => {
                 </div>
                 <h3>Our Vision</h3>
                 <p>
-                  We want to revolutionize urban mobility by making car ownership optional and 
+                  We want to revolutionize urban mobility by making car ownership optional and
                   car sharing the preferred choice for millions of Indians.
                 </p>
               </motion.div>
@@ -502,12 +502,12 @@ const About = () => {
                 <span className={styles.sectionEyebrow}>✦ Who We Are</span>
                 <h2 className={styles.sectionTitle}>India's Fastest Growing<br /><span className={styles.gradientText}>Car Rental Platform</span></h2>
                 <p>
-                  We founded Car24 with a vision to transform how India travels. Today, we have emerged as 
-                  the country's most trusted self-drive car rental marketplace. We connect car owners 
+                  We founded Car24 with a vision to transform how India travels. Today, we have emerged as
+                  the country's most trusted self-drive car rental marketplace. We connect car owners
                   with travellers, creating a seamless ecosystem that benefits everyone involved.
                 </p>
                 <p>
-                  Our innovative technology platform has simplified the entire rental process — from booking 
+                  Our innovative technology platform has simplified the entire rental process — from booking
                   to key handover. We are proud to have facilitated over 50,000 happy journeys across 100+ cities.
                 </p>
                 <div className={styles.overviewFeatures}>
@@ -537,8 +537,8 @@ const About = () => {
                 viewport={{ once: true }}
               >
                 <div className={styles.imageWrapper}>
-                  <img 
-                    src="https://images.unsplash.com/photo-1550355291-bbee04a92027?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" 
+                  <img
+                    src="https://images.unsplash.com/photo-1550355291-bbee04a92027?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
                     alt="Car24 fleet"
                   />
                   <div className={styles.imageGlow} />

@@ -458,7 +458,7 @@ function BookingPanel({
             </div>
             <p className="bp-policy-note">
               ℹ️ All refunds are processed within 5–7 business days. For disputes, contact
-              <a href="mailto:support@car24.in"> support@car24.in</a>
+              <a href="mailto:Car24travel@gmail.com"> Car24travel@gmail.com</a>
             </p>
           </div>
         )}

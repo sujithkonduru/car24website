@@ -15,11 +15,11 @@ const ROLE_LABEL = {
 };
 
 const NAV_LINKS = [
-  // { to: "/", label: "Home", end: true },
+  { to: "/", label: "Home", end: true },
   // { to: "/cars", label: "Cars" },
-  // { to: "/bookings", label: "Bookings" },
-  // { to: "/about", label: "About" },
-  // { to: "/contact", label: "Contact" },
+  { to: "/bookings", label: "Bookings" },
+  { to: "/about", label: "About" },
+  { to: "/contact", label: "Contact" },
 ];
 
 /* ── Icons ── */
