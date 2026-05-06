@@ -54,19 +54,19 @@ function App() {
           {/* ── Public ── */}
           {/* <Route path="/" element={<Home />} />   */}
           {/* /cars is an alias for the home page cars section */}
-          {/* <Route path="/cars" element={<Navigate to="/#cars" replace />} /> 
-          <Route path="/car/:id" element={<CarDetail />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/locations" element={<Locations />} />
-          <Route path="/faq" element={<FAQ />} />
+          {/* <Route path="/cars" element={<Navigate to="/#cars" replace />} />  */}
+          {/* <Route path="/car/:id" element={<CarDetail />} /> */}
+          {/* <Route path="/login" element={<Login />} /> */}
+          {/* <Route path="/register" element={<Register />} /> */}
+          {/* <Route path="/forgot-password" element={<ForgotPassword />} /> */}
+          {/* <Route path="/about" element={<About />} /> */}
+          {/* <Route path="/contact" element={<Contact />} /> */}
+          {/* <Route path="/locations" element={<Locations />} /> */}
+          {/* <Route path="/faq" element={<FAQ />} /> */}
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-and-conditions" element={<TermsOfService />} />
           <Route path="/cancellation-policy" element={<CancellationPolicy />} />
-          <Route path="/help" element={<Help />} /> */}
+          {/* <Route path="/help" element={<Help />} /> */} 
           {/* /register-owner is an alias for owner registration */}
           {/* <Route path="/register-owner" element={<Navigate to="/owner/register" replace />} />  */}
             <Route path="/" element={<LaunchPage />} /> 
@@ -80,14 +80,14 @@ function App() {
               </ProtectedRoute>
             }
           /> */}
-           <Route
+           {/* <Route
             path="/tracking/:bookingId"
             element={
               <ProtectedRoute allowedRoles={["user", "owner", "staff", "branch_head", "admin", "superadmin"]}>
                 <LiveTracking />
               </ProtectedRoute>
             }
-          />
+          /> */}
           {/* <Route
             path="/bookings"
             element={
