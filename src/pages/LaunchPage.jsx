@@ -203,7 +203,7 @@ const LaunchPage = () => {
       {/* Footer */}
       <footer className="footer">
         <div className="container">
-          <p>&copy; 2024 Car24. All rights reserved.</p>
+          <p>&copy; 2026 Car24travels. All rights reserved.</p>
           <p className="footer-note">Launching soon across India</p>
         </div>
       </footer>
