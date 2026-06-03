@@ -611,8 +611,8 @@ function EditBranchModal({ branch, onClose, onSave, toast }) {
     const loadSubAdmins = async () => {
       setLoadingSubAdmins(true);
       try {
-        // Fetch all Sub Admins (users with role = 'branch_head')
-        const res = await getManagementUsers("null", "null", "branch_head", "100", "0");
+        // Fetch all Sub Admins (users with role = 'sub_admin')
+        const res = await getManagementUsers("null", "null", "sub_admin", "100", "0");
         console.log("Loaded sub admins:", res?.data);
         setSubAdmins(Array.isArray(res?.data) ? res.data : []);
       } catch (error) {
@@ -863,15 +863,15 @@ function StaffForm({ form, setForm, branches, onSubmit, onCancel, submitLabel, i
         <select
           style={{ ...s.select, width: "100%" }}
           value={form.role}
-          onChange={e => setForm(f => ({ ...f, role: e.target.value, branchId: e.target.value !== "branch_head" ? "" : f.branchId }))}
+          onChange={e => setForm(f => ({ ...f, role: e.target.value, branchId: e.target.value !== "sub_admin" ? "" : f.branchId }))}
         >
-          <option value="branch_head">Branch Head</option>
+          <option value="sub_admin">Branch Head</option>
           <option value="admin">Admin</option>
           <option value="support">Support Staff</option>
         </select>
       </div>
       
-      {form.role === "branch_head" && (
+      {form.role === "sub_admin" && (
         <div>
           <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>Assign Branch *</div>
           <select
@@ -900,7 +900,7 @@ function BranchFormComponent({ form, setForm, fields, onSubmit, onCancel, submit
   const [branchHeads, setBranchHeads] = useState([]);
 
   useEffect(() => {
-    getManagementUsers("null", "null", "branch_head", "100", "0")
+    getManagementUsers("null", "null", "sub_admin", "100", "0")
       .then(res => setBranchHeads(Array.isArray(res?.data) ? res.data : []))
       .catch(() => setBranchHeads([]));
   }, []);
@@ -1329,7 +1329,7 @@ function ManagementSection({ toast }) {
     name: "", 
     email: "", 
     mobile: "", 
-    role: "branch_head", 
+    role: "sub_admin", 
     branchId: "",
     password: ""
   });
@@ -1370,7 +1370,7 @@ function ManagementSection({ toast }) {
     if (!form.mobile?.trim()) { toast("Mobile number is required", "error"); return; }
     if (!form.password?.trim()) { toast("Password is required", "error"); return; }
     
-    if (form.role === "branch_head" && !form.branchId) { 
+    if (form.role === "sub_admin" && !form.branchId) { 
       toast("Branch is required for Sub Admin", "error"); 
       return; 
     }
@@ -1418,7 +1418,7 @@ function ManagementSection({ toast }) {
         toast("Staff member verified successfully!", "success");
         setShowOtpModal(false);
         setOtpData({ email: "", otp: "" });
-        setForm({ name: "", email: "", mobile: "", role: "branch_head", branchId: "", password: "" });
+        setForm({ name: "", email: "", mobile: "", role: "sub_admin", branchId: "", password: "" });
         loadStaff(); // Refresh the staff list
       }
     } catch (error) {
@@ -1566,7 +1566,7 @@ function ManagementSection({ toast }) {
             style={{ background: "transparent", border: "none", color: C.text, outline: "none", cursor: "pointer" }}
           >
             <option value="null">All Roles</option>
-            <option value="branch_head">Sub Admins</option>
+            <option value="sub_admin">Sub Admins</option>
             <option value="admin">Admins</option>
             <option value="support">Support Staff</option>
           </select>
@@ -1616,16 +1616,16 @@ function ManagementSection({ toast }) {
                     <td style={{ ...s.td, color: C.muted }}>{staffItem.mobileNo || staffItem.mobile}</td>
                     <td style={s.td}>
                       <span style={s.tag(
-                        staffItem.role === "branch_head" ? C.cyan : 
+                        staffItem.role === "sub_admin" ? C.cyan : 
                         staffItem.role === "admin" ? C.purple : C.accent
                       )}>
-                        {staffItem.role === "branch_head" ? "Sub Admin" : 
+                        {staffItem.role === "sub_admin" ? "Sub Admin" : 
                          staffItem.role === "admin" ? "Admin" : "Support"}
                       </span>
                     </td>
                     <td style={s.td}>
                       {staffItem.branch_name || staffItem.branch || "—"}
-                      {staffItem.role === "branch_head" && !staffItem.branch_name && (
+                      {staffItem.role === "sub_admin" && !staffItem.branch_name && (
                         <span style={{ fontSize: 10, color: C.red }}> (No branch assigned)</span>
                       )}
                     </td>
@@ -1728,14 +1728,14 @@ function ManagementSection({ toast }) {
                 <select
                   style={{ ...s.select, width: "100%" }}
                   value={form.role}
-                  onChange={e => setForm(f => ({ ...f, role: e.target.value, branchId: e.target.value !== "branch_head" ? "" : f.branchId }))}
+                  onChange={e => setForm(f => ({ ...f, role: e.target.value, branchId: e.target.value !== "sub_admin" ? "" : f.branchId }))}
                 >
-                  <option value="branch_head">Sub Admin (Branch Manager)</option>
+                  <option value="sub_admin">Sub Admin (Branch Manager)</option>
                   <option value="admin">Admin</option>
                   <option value="support">Support Staff</option>
                 </select>
                 <div style={{ fontSize: 10, color: C.cyan, marginTop: 4 }}>
-                  {form.role === "branch_head" 
+                  {form.role === "sub_admin" 
                     ? "Sub Admins can only manage their assigned branch" 
                     : form.role === "admin" 
                     ? "Admins have broader management permissions" 
@@ -1743,7 +1743,7 @@ function ManagementSection({ toast }) {
                 </div>
               </div>
               
-              {form.role === "branch_head" && (
+              {form.role === "sub_admin" && (
                 <div>
                   <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
                     Assign Branch *
@@ -1772,7 +1772,7 @@ function ManagementSection({ toast }) {
               )}
               
               <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8 }}>
-                <button style={s.btn(C.muted, true)} onClick={() => { setShowCreate(false); setForm({ name: "", email: "", mobile: "", role: "branch_head", branchId: "", password: "" }); }}>
+                <button style={s.btn(C.muted, true)} onClick={() => { setShowCreate(false); setForm({ name: "", email: "", mobile: "", role: "sub_admin", branchId: "", password: "" }); }}>
                   Cancel
                 </button>
                 <button style={s.btn(C.green)} onClick={handleCreate}>
@@ -1854,15 +1854,15 @@ function ManagementSection({ toast }) {
                 <select
                   style={{ ...s.select, width: "100%" }}
                   value={form.role}
-                  onChange={e => setForm(f => ({ ...f, role: e.target.value, branchId: e.target.value !== "branch_head" ? "" : f.branchId }))}
+                  onChange={e => setForm(f => ({ ...f, role: e.target.value, branchId: e.target.value !== "sub_admin" ? "" : f.branchId }))}
                 >
-                  <option value="branch_head">Sub Admin (Branch Manager)</option>
+                  <option value="sub_admin">Sub Admin (Branch Manager)</option>
                   <option value="admin">Admin</option>
                   <option value="support">Support Staff</option>
                 </select>
               </div>
               
-              {form.role === "branch_head" && (
+              {form.role === "sub_admin" && (
                 <div>
                   <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
                     Assign Branch *

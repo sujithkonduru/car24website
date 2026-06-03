@@ -12,7 +12,7 @@ function roleRedirect(role) {
     case "staff":      return "/staff/dashboard";
     
     case "sub_admin":   return "/branch_dashboard";
-    case "branch_head": return "/branch_dashboard";
+    case "sub_admin": return "/branch_dashboard";
     case "admin":      return "/admin/dashboard";
     case "superadmin": return "/superadmin/dashboard";
     default:           return "/";

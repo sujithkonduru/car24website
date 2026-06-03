@@ -43,11 +43,11 @@ export function AuthProvider({ children }) {
   const role = user?.role || null;
   const isUser = role === "user";
   const isOwner = role === "owner";
-  const isBranchHead = role === "branch_head";
+  const isBranchHead = role === "sub_admin";
   const isSubAdmin = role === "sub_admin";
   const isStaff = ["staff"].includes(role);
   const isAdmin = ["admin", "superadmin"].includes(role);
-  const isManagement = ["staff", "sub_admin", "branch_head", "admin", "superadmin"].includes(role);
+  const isManagement = ["staff", "sub_admin", "sub_admin", "admin", "superadmin"].includes(role);
 
   return (
     <AuthContext.Provider

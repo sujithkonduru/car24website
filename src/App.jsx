@@ -83,7 +83,7 @@ function App() {
            <Route
             path="/tracking/:bookingId"
             element={
-              <ProtectedRoute allowedRoles={["user", "owner", "staff", "branch_head", "admin", "superadmin"]}>
+              <ProtectedRoute allowedRoles={["user", "owner", "staff", "sub_admin", "admin", "superadmin"]}>
                 <LiveTracking />
               </ProtectedRoute>
             }
@@ -99,7 +99,7 @@ function App() {
           <Route
             path="/profile"
             element={
-              <ProtectedRoute allowedRoles={["user", "owner", "staff", "branch_head", "admin", "superadmin"]}>
+              <ProtectedRoute allowedRoles={["user", "owner", "staff", "sub_admin", "admin", "superadmin"]}>
                 <Profile />
               </ProtectedRoute>
             }
@@ -107,7 +107,7 @@ function App() {
           <Route
             path="/car-register"
             element={
-              <ProtectedRoute allowedRoles={["user", "owner", "branch_head"]}>
+              <ProtectedRoute allowedRoles={["user", "owner", "sub_admin"]}>
                 <CarRegister />
               </ProtectedRoute>
             }
@@ -209,7 +209,7 @@ function App() {
           <Route
             path="/branch_dashboard"
             element={
-              <ProtectedRoute allowedRoles={["branch_head", "sub_admin"]} redirectTo="/branch/login">
+              <ProtectedRoute allowedRoles={["sub_admin", "sub_admin"]} redirectTo="/branch/login">
                 <BranchDashboard />
               </ProtectedRoute>
             }
@@ -217,7 +217,7 @@ function App() {
           <Route
             path="/branch/bookings"
             element={
-              <ProtectedRoute allowedRoles={["branch_head", "sub_admin"]} redirectTo="/branch/login">
+              <ProtectedRoute allowedRoles={["sub_admin", "sub_admin"]} redirectTo="/branch/login">
                 <BranchBookings />
               </ProtectedRoute>
             }
@@ -226,7 +226,7 @@ function App() {
           <Route
             path="/branch_cars"
             element={
-              <ProtectedRoute allowedRoles={["branch_head", "sub_admin"]} redirectTo="/branch/login">
+              <ProtectedRoute allowedRoles={["sub_admin", "sub_admin"]} redirectTo="/branch/login">
                 <BranchFleet />
               </ProtectedRoute>
             }
@@ -234,7 +234,7 @@ function App() {
           <Route
             path="/branch/fleet"
             element={
-              <ProtectedRoute allowedRoles={["branch_head", "sub_admin"]} redirectTo="/branch/login">
+              <ProtectedRoute allowedRoles={["sub_admin", "sub_admin"]} redirectTo="/branch/login">
                 <BranchFleet />
               </ProtectedRoute>
             }
@@ -242,7 +242,7 @@ function App() {
           <Route
             path="/branch/staff"
             element={
-              <ProtectedRoute allowedRoles={["branch_head", "sub_admin"]} redirectTo="/branch/login">
+              <ProtectedRoute allowedRoles={["sub_admin", "sub_admin"]} redirectTo="/branch/login">
                 <BranchStaff />
               </ProtectedRoute>
             }
@@ -250,7 +250,7 @@ function App() {
           <Route
             path="/branch/activities"
             element={
-              <ProtectedRoute allowedRoles={["branch_head", "sub_admin"]} redirectTo="/branch/login">
+              <ProtectedRoute allowedRoles={["sub_admin", "sub_admin"]} redirectTo="/branch/login">
                 <BranchActivities />
               </ProtectedRoute>
             }

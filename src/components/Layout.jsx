@@ -10,7 +10,7 @@ const PHONE = "9247536486";
 
 const ROLE_LABEL = {
   user: "User", owner: "Owner", staff: "Staff",
-  branch_head: "Branch Head", subadmin: "Sub-Admin",
+  sub_admin: "Branch Head", subadmin: "Sub-Admin",
   admin: "Admin", superadmin: "Super Admin",
 };
 

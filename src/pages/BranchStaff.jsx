@@ -112,12 +112,12 @@ export default function BranchStaff() {
             >
               ↻ Refresh
             </button>
-            <button
+            {/* <button
               className="bhd-staff-btn bhd-staff-btn-primary"
               style={{ minHeight: "42px", padding: "10px 18px" }}
             >
               ➕ Add Staff
-            </button>
+            </button> */}
           </div>
         </div>
 
@@ -223,7 +223,7 @@ export default function BranchStaff() {
 
                   <div className="bhd-staff-card-item">
                     <span className="bhd-staff-card-label">📞 Phone</span>
-                    <p className="bhd-staff-card-value">{member.phone || "N/A"}</p>
+                    <p className="bhd-staff-card-value">{member.mobileNo || "N/A"}</p>
                   </div>
 
                   <div className="bhd-staff-card-item">

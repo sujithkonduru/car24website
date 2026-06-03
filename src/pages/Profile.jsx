@@ -118,7 +118,7 @@ export default function Profile() {
     try {
       let profileRes;
 
-      if (role === 'branch_head' || role === 'sub_admin' || role === 'staff' || role === 'admin' || role === 'superadmin') {
+      if (role === 'sub_admin' || role === 'sub_admin' || role === 'staff' || role === 'admin' || role === 'superadmin') {
         try {
           profileRes = await apiGet("/roleauth/getManagementProfile", { withAuth: true });
           profileRes = {
@@ -175,7 +175,7 @@ export default function Profile() {
       let notificationsRes = [];
 
       // Load credits (only for regular users)
-      if (role !== 'staff' && role !== 'branch_head') {
+      if (role !== 'staff' && role !== 'sub_admin') {
         try {
           creditsRes = await apiGet("/bookingApi/myCredits", { withAuth: true });
         } catch (creditsError) {
@@ -184,7 +184,7 @@ export default function Profile() {
       }
 
       // Load documents (only for regular users)
-      if (role !== 'staff' && role !== 'branch_head' && role !== 'sub_admin' && role !== 'admin') {
+      if (role !== 'staff' && role !== 'sub_admin' && role !== 'sub_admin' && role !== 'admin') {
         try {
           docsRes = await apiGet("/user/getDocuments", { withAuth: true });
         } catch (docsError) {
@@ -203,7 +203,7 @@ export default function Profile() {
       // Load bookings - Fixed version with getBranchBookingsByDate
      // Load bookings - Fixed version with proper role handling
 try {
-  if (role === 'staff' || role === 'branch_head' || role === 'sub_admin' || role === 'admin' || role === 'superadmin' || role === 'Admin') {
+  if (role === 'staff' || role === 'sub_admin' || role === 'sub_admin' || role === 'admin' || role === 'superadmin' || role === 'Admin') {
     const branchId = profileRes?.userData?.branch_id;
     
     if (branchId && branchId !== 'null' && branchId !== null) {
@@ -489,7 +489,7 @@ const isProfileComplete = userData?.is_profile_completed || hasDocuments;
 const totalBookings = Array.isArray(bookings) ? bookings.length : 0;
 const unreadNotifications = notifications.filter(n => !n.read).length;
 
-const isStaffOrBranchHead = role === 'staff' || role === 'branch_head';
+const isStaffOrBranchHead = role === 'staff' || role === 'sub_admin';
 const displayBookings = isStaffOrBranchHead ? branchBookings : bookings;
 
 const tabs = [
@@ -548,7 +548,7 @@ return (
           <h1>{userData?.name || "User"}</h1>
           <p className="profile-role">
             <span className={`role-badge-modern ${userData?.role}`}>
-              {userData?.role === 'branch_head' ? 'Branch Head' :
+              {userData?.role === 'sub_admin' ? 'Branch Head' :
                 userData?.role === 'staff' ? 'Staff Member' :
                   userData?.role === 'owner' ? 'Car Owner' :
                     userData?.role === 'admin' ? 'Administrator' :
@@ -595,7 +595,7 @@ return (
             <Settings size={20} />
           </motion.button>
 
-          {(!hasDocuments || !userData?.is_profile_completed) && role !== 'branch_head' && role !== 'staff' && (
+          {(!hasDocuments || !userData?.is_profile_completed) && role !== 'sub_admin' && role !== 'staff' && (
             <motion.button
               className="btn-outline-modern"
               onClick={() => setShowDocumentModal(true)}
@@ -1267,7 +1267,7 @@ return (
 
     {/* Document Upload Modal */}
     <AnimatePresence>
-      {role !== 'branch_head' && role !== 'staff' && showDocumentModal && (
+      {role !== 'sub_admin' && role !== 'staff' && showDocumentModal && (
         <motion.div
           className="modal-overlay-modern"
           initial={{ opacity: 0 }}

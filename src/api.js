@@ -575,8 +575,36 @@ export async function uploadOwnerDocument(formData) {
 }
 
 export async function createManagement(data) {
-  return createStaff(data);
+  const payload = {
+    name: data.name?.trim(),
+    email: data.email?.trim(),
+    mobileNo: data.mobileNo?.trim(),
+    role: data.role || "staff",
+    branch: data.branch_id ? parseInt(data.branch_id) : null,
+    password: data.password || generateRandomPassword(),
+  };
+
+  const response = await fetch(`${API_BASE}/roleauth/createMangement`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || "Failed to create staff member");
+  }
+
+  return await response.json();
 }
+
+// Helper function to generate random password
+const generateRandomPassword = () => {
+  return Math.random().toString(36).slice(-8);
+};
 
 // ── Staff OTP Verification ─────────────────────────────────
 export async function sendStaffOtp(email) {
@@ -822,12 +850,6 @@ export function getStatusColor(status) {
   return colors[status] || "#6b7280";
 }
 
-
-// src/services/api.js
-// const API_BASE_URL = process.env.REACT_APP_API_URL || '';
-
-// Add this to your api.js file (around line 450+ after your other exports)
-
 // ── Firebase Push Notifications ──────────────────────────────────
 export async function addFirebaseToken(fcmToken, email) {
   try {
@@ -882,7 +904,6 @@ export async function updateNotificationPreferences(preferences) {
     throw error;
   }
 }
-
 
 export const createOfflineBooking = async (bookingData) => {
   try {

@@ -22,7 +22,7 @@ export default function BranchLogin() {
       if (res.Logintoken) {
         setAuth(res.Logintoken);
         const decoded = decodeToken(res.Logintoken);
-        if (decoded?.role === "branch_head" || decoded?.role === "sub_admin") {
+        if (decoded?.role === "sub_admin" || decoded?.role === "sub_admin") {
           navigate("/branch_dashboard");
         } else if (decoded?.role === "admin" || decoded?.role === "superadmin") {
           navigate("/admin/dashboard");

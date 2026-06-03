@@ -95,7 +95,7 @@ export default function BranchVerify() {
         if (user) {
           login(user, token);
         } else {
-          login({ email: email, role: 'branch_head' }, token);
+          login({ email: email, role: 'sub_admin' }, token);
         }
 
         setMessage("✓ Email verified successfully! Redirecting to branch dashboard...");

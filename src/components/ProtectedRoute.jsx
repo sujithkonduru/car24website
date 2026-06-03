@@ -17,7 +17,7 @@ export default function ProtectedRoute({ children, allowedRoles = "any", redirec
 
   if (allowedRoles !== "any" && !allowedRoles.includes(role)) {
     if (role === "owner") return <Navigate to="/owner/dashboard" replace />;
-    if (role === "branch_head") return <Navigate to="/branch_dashboard" replace />;
+    if (role === "sub_admin") return <Navigate to="/branch_dashboard" replace />;
     if (role === "staff") return <Navigate to="/staff/dashboard" replace />;
     if (role === "sub_admin") return <Navigate to="/branch_dashboard" replace />;
     if (role === "admin") return <Navigate to="/admin/dashboard" replace />;

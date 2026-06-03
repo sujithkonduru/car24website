@@ -705,7 +705,7 @@ body {
   color: var(--info);
 }
 
-.role-badge.branch_head {
+.role-badge.sub_admin {
   background: rgba(139, 92, 246, 0.2);
   color: var(--purple);
 }

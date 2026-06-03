@@ -76,7 +76,7 @@ export default function StaffVerify() {
         setTimeout(() => {
           if (res.user?.role === 'admin' || res.user?.role === 'super_admin') {
             navigate("/admin/dashboard");
-          } else if (res.user?.role === 'branch_head' || res.user?.role === 'sub_admin') {
+          } else if (res.user?.role === 'sub_admin' || res.user?.role === 'sub_admin') {
             navigate("/branch_dashboard");
           } else {
             navigate("/staff/dashboard");

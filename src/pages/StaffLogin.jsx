@@ -25,7 +25,7 @@ export default function StaffLogin() {
         const role = decoded?.role;
         if (role === "admin" || role === "superadmin") {
           navigate("/admin/dashboard");
-        } else if (role === "branch_head" || role === "sub_admin" || role === "subadmin") {
+        } else if (role === "sub_admin" || role === "sub_admin" || role === "subadmin") {
           navigate("/branch_dashboard");
         } else if (role === "staff") {
           navigate("/staff/dashboard");
@@ -58,7 +58,7 @@ export default function StaffLogin() {
           <p className="small muted">
             <Link to="/login">User login</Link>
             {" · "}<Link to="/owner/login">Owner login</Link>
-            {" · "}<Link to="/branch/login">Branch Head</Link>
+            {/* {" · "}<Link to="/branch/login">Branch Head</Link> */}
           </p>
         </div>
 
