@@ -13,6 +13,11 @@ export default function BranchStaff() {
 
   const branchId = localStorage.getItem("branch_id");
 
+// if (!branchId) {
+//   console.error("Branch ID missing in localStorage");
+//   // redirect user or show error
+// }
+
   useEffect(() => {
     loadStaff();
   }, []);

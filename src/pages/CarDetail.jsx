@@ -1073,12 +1073,12 @@ function BookingPanel({ car, isLoggedIn, onBook, bookingBusy, bookingErr, bookin
   <div
     onClick={(e) => e.stopPropagation()}
     style={{
-      width: "100%",
-      maxWidth: "920px",
-      maxHeight: "92vh",
+      width: "80%",
+      maxWidth: "720px",
+      maxHeight: "72vh",
       overflowY: "auto",
       background: "#ffffff",
-      borderRadius: "28px",
+      borderRadius: "18px",
       boxShadow: "0 25px 80px rgba(15,23,42,0.25)",
       border: "1px solid rgba(255,255,255,0.2)",
     }}
@@ -1094,8 +1094,8 @@ function BookingPanel({ car, isLoggedIn, onBook, bookingBusy, bookingErr, bookin
         background:
           "linear-gradient(135deg,#06b6d4 0%, #0ea5e9 50%, #2563eb 100%)",
         color: "#fff",
-        borderTopLeftRadius: "28px",
-        borderTopRightRadius: "28px",
+        borderTopLeftRadius: "18px",
+        borderTopRightRadius: "18px",
       }}
     >
       <div>
@@ -1217,7 +1217,7 @@ function BookingPanel({ car, isLoggedIn, onBook, bookingBusy, bookingErr, bookin
           background: "#fff",
           borderRadius: "24px",
           border: "1px solid #e2e8f0",
-          padding: "22px",
+          padding: "20px",
           boxShadow: "0 10px 30px rgba(15,23,42,0.04)",
         }}
       >

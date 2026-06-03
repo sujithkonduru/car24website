@@ -2515,4 +2515,125 @@
     position: relative;
     max-width: 100%;
   }
+  /* ═══════════════════════════════════════════════════════════════
+   MINIMIZED CALENDAR & TIME SELECTION STYLES
+═══════════════════════════════════════════════════════════════ */
+
+/* 1. Shrink the main modal box to a tight minimum width */
+.cal-modal-content {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  
+  /* MINIMIZE WIDTH: Tight footprint just wide enough for 7 columns */
+  max-width: 340px; 
+  
+  /* MINIMIZE HEIGHT: Removes empty spacing */
+  min-height: auto; 
+  max-height: 95vh;
+  
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Tighten modal body interior padding */
+.cal-modal-body {
+  padding: 12px; /* Reduced from 24px */
+}
+
+/* 2. Tighten the Calendar Grid */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px; /* Tiny gap to compress the structural width */
+  margin-bottom: 10px;
+}
+
+/* 3. Minimized Day Blocks */
+.calendar-day-header,
+.calendar-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: none;
+  font-size: 12px; /* Smaller font for tighter space */
+  position: relative;
+
+  /* MINIMIZE DAY BOXES: Small operational square sizing */
+  width: 100%;
+  height: 34px; 
+  
+  transition: all 0.15s ease;
+}
+
+/* Minimize the "Today/Tomorrow" label so it doesn't collide with the numbers */
+.day-badge {
+  font-size: 8px;
+  position: absolute;
+  bottom: 1px;
+  transform: scale(0.9);
+  line-height: 1;
+}
+
+/* 4. Compressed Return Slots Section */
+.duration-slots-selector {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+.duration-slots-selector h4 {
+  font-size: 12px;
+  margin: 0 0 6px 0;
+}
+
+/* 5. Tighten the slots flex layout */
+.slots-flex-row {
+  display: flex;
+  flex-direction: row;
+  gap: 6px; /* Closely grouped spacing */
+  flex-wrap: wrap;
+}
+
+/* 6. Tiny Time Slot Pills */
+.slot-pill-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 85px; /* Lowest width bounds before text clips */
+  
+  /* MINIMIZE TIME PILL HEIGHT */
+  height: 48px; 
+  
+  padding: 4px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Scale down internal text properties to fit micro dimensions */
+.slot-label { font-size: 11px; font-weight: 600; }
+.slot-time  { font-size: 9px; color: #64748b; margin: 0; }
+.slot-cost  { font-size: 10px; font-weight: 700; color: #4f46e5; }
+
+/* Modal Header and Footer structural adjustments */
+.cal-modal-header {
+  padding: 10px 14px;
+}
+.cal-modal-header h3 {
+  font-size: 14px;
+}
+.cal-modal-footer {
+  padding: 8px 14px;
+}
+.cal-modal-footer button {
+  padding: 6px 14px;
+  font-size: 12px;
+}
 }
